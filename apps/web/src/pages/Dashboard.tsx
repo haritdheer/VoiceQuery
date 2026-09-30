@@ -124,11 +124,26 @@ export function Dashboard({
   const isGuest = Boolean(session.user?.isGuest);
   const guestExhausted = Boolean(session.guest?.exhausted);
 
+  /**
+   * A signed-in account with nothing but the demo provider behind it.
+   *
+   * Guests are excluded deliberately: canned answers are the whole point of
+   * the anonymous tour, and it is what keeps anonymous traffic off a paid
+   * endpoint. But someone who has made an account is past the tour — letting
+   * them keep asking questions would just be teaching them that the product
+   * makes things up. `aiMode` is the server's per-session verdict, so this
+   * clears the moment a key is connected.
+   */
+  const demoLocked = !isGuest && session.aiMode === 'demo';
+
   /* -------------------------------- analysis ------------------------------- */
 
   const ask = useCallback(
     async (question: string) => {
       if (!selectedId) return;
+      // The gate makes this unreachable through the UI; this is the guard for
+      // a stale closure or a voice result landing after the mode changed.
+      if (demoLocked) return;
       setError(null);
 
       // A stable key means a retry of this exact request cannot double-charge.
@@ -193,6 +208,7 @@ export function Dashboard({
     [
       selectedId,
       conversationId,
+      demoLocked,
       isGuest,
       session.guest?.questionsUsed,
       config.guest,
@@ -369,7 +385,18 @@ export function Dashboard({
         </aside>
 
         {/* ------------------------------ conversation ----------------------------- */}
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="relative flex min-w-0 flex-1 flex-col">
+          <div
+            className={cx(
+              'flex min-h-0 flex-1 flex-col',
+              // `inert` is what actually stops input — it takes the whole
+              // subtree out of the tab order and swallows pointer events, so
+              // the block holds for keyboard and screen-reader users too
+              // rather than just looking closed. The blur is the signal.
+              demoLocked && 'pointer-events-none blur-[3px] select-none',
+            )}
+            inert={demoLocked}
+          >
           <div className="flex-1 space-y-5 overflow-y-auto pb-4">
             {messages.length === 0 && !pending && (
               <EmptyState
@@ -432,8 +459,63 @@ export function Dashboard({
                 : 'Answers are generated from your data. Check the SQL and results before relying on them for a decision.'}
             </p>
           </div>
+          </div>
+
+          {demoLocked && <RealAiGate onConnectKey={() => onConnectKey?.()} />}
         </main>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Sits over the blurred conversation when a signed-in account has no real
+ * model behind it. Scoped to this column on purpose rather than being a
+ * page-wide dialog: the sidebar and Settings stay reachable, so the user can
+ * look at their data and connect a key instead of being boxed in with one
+ * button.
+ */
+function RealAiGate({ onConnectKey }: { onConnectKey: () => void }) {
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center p-4"
+      role="region"
+      aria-label="Real AI required"
+    >
+      <Card className="vq-rise max-w-md p-6 text-center shadow-2xl">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-soft)]">
+          <svg className="h-5 w-5 text-[var(--accent)]" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M10 2.5l1.9 4.2 4.6.5-3.4 3.1.9 4.5L10 12.6l-4 2.2.9-4.5L3.5 7.2l4.6-.5L10 2.5z"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+
+        <h2 className="text-base font-semibold text-[var(--text-primary)]">
+          Connect an AI provider to ask questions
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+          This deployment has no AI provider of its own, so the only answers it can produce are
+          canned demo responses. Rather than hand you a made-up number that looks real, questions
+          are paused until a key is connected.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+          Add an Anthropic, OpenAI or OpenRouter key and every question is answered by that
+          model, billed to your own account. Your key is held in server memory for this session
+          only — never written to a database, a log or your browser.
+        </p>
+
+        <div className="mt-5">
+          <Button onClick={onConnectKey}>Use real AI</Button>
+        </div>
+        <p className="mt-3 text-xs text-[var(--text-muted)]">
+          The dataset panel, schema and SQL engine all still work — it is only the model that is
+          missing.
+        </p>
+      </Card>
     </div>
   );
 }

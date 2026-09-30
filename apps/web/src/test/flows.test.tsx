@@ -377,9 +377,9 @@ describe('exhausted credits', () => {
     expect(screen.getByText('Your API key')).toBeInTheDocument();
   });
 
-  it('keeps the composer in free demo mode, which makes no provider calls', async () => {
+  it('does not charge credits in free demo mode', async () => {
     renderDashboard(SESSION(0, 'demo', false));
-    expect(await screen.findByLabelText('Ask a question about your data')).toBeInTheDocument();
+    await screen.findByText('Demo answers');
     expect(screen.queryByText(/You've used your 2 free questions/)).not.toBeInTheDocument();
   });
 
@@ -389,13 +389,87 @@ describe('exhausted credits', () => {
     renderDashboard(SESSION(0, 'demo', false), { onConnectKey });
 
     expect(await screen.findByText('Demo answers')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Use real AI' }));
+    await user.click(
+      within(screen.getByRole('banner')).getByRole('button', { name: 'Use real AI' }),
+    );
     expect(onConnectKey).toHaveBeenCalled();
   });
 
   it('still gates demo mode when the operator opts into charging', async () => {
     renderDashboard(SESSION(0, 'demo', true));
     expect(await screen.findByText(/You've used your 2 free questions/)).toBeInTheDocument();
+  });
+
+  /* ------------------------ signed-in demo-mode gate ----------------------- */
+
+  describe('real-AI gate', () => {
+    /** The conversation column, which is the element the gate makes inert. */
+    const chatColumn = () => screen.getByRole('main').firstElementChild as HTMLElement;
+
+    it('stops a signed-in account from asking anything on demo answers', async () => {
+      renderDashboard(SESSION(2, 'demo', false));
+
+      expect(
+        await screen.findByText('Connect an AI provider to ask questions'),
+      ).toBeInTheDocument();
+      // `inert` is what enforces it: the textarea and the example-question
+      // buttons are still rendered, but nothing inside can be typed in,
+      // clicked or tabbed to.
+      expect(chatColumn()).toHaveAttribute('inert');
+      expect(chatColumn()).toContainElement(
+        screen.getByLabelText('Ask a question about your data'),
+      );
+    });
+
+    it('explains why rather than just refusing', async () => {
+      renderDashboard(SESSION(2, 'demo', false));
+      expect(await screen.findByText(/canned demo responses/)).toBeInTheDocument();
+      expect(screen.getByText(/never written to a database, a log or your browser/))
+        .toBeInTheDocument();
+    });
+
+    it('the gate button opens the key form', async () => {
+      const user = userEvent.setup();
+      const onConnectKey = vi.fn();
+      renderDashboard(SESSION(2, 'demo', false), { onConnectKey });
+
+      const gate = within(await screen.findByRole('region', { name: 'Real AI required' }));
+      await user.click(gate.getByRole('button', { name: 'Use real AI' }));
+      expect(onConnectKey).toHaveBeenCalled();
+    });
+
+    it('leaves a guest free to explore, since that is the point of the tour', async () => {
+      const guest = SESSION(0, 'demo', false);
+      renderDashboard({
+        ...guest,
+        user: { ...guest.user!, isGuest: true, email: null },
+        guest: { questionsUsed: 0, questionsLimit: 3, exhausted: false },
+      });
+      await screen.findByText('Demo · not signed in');
+      expect(screen.queryByText('Connect an AI provider to ask questions')).not.toBeInTheDocument();
+      expect(chatColumn()).not.toHaveAttribute('inert');
+    });
+
+    it('lifts as soon as a key is connected', async () => {
+      const { rerender } = renderDashboard(SESSION(2, 'demo', false));
+      await screen.findByText('Connect an AI provider to ask questions');
+
+      rerender(
+        <Dashboard
+          session={SESSION(2, 'byok')}
+          config={CONFIG}
+          onOpenSettings={noop}
+          onOutOfCredits={noop}
+          onSessionRefresh={noop}
+          onSignOut={noop}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByText('Connect an AI provider to ask questions')).toBeNull(),
+      );
+      expect(chatColumn()).not.toHaveAttribute('inert');
+    });
   });
 
   it('opens the upgrade modal when the server reports 402', async () => {

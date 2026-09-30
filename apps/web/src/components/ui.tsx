@@ -224,7 +224,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 backdrop-blur-sm sm:items-center"
       onMouseDown={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}
