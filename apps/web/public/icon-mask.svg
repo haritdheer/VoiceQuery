@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Safari pinned tabs render a single-colour silhouette, so the mark is
+       drawn as bare shapes with no background plate. -->
+  <rect x="5.5"  y="15" width="5" height="11" rx="2.5"/>
+  <rect x="13.5" y="6"  width="5" height="20" rx="2.5"/>
+  <rect x="21.5" y="11" width="5" height="15" rx="2.5"/>
+</svg>

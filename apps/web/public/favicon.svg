@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="VoiceQuery">
+  <!--
+    Tab icon: the same ascending bar-chart mark as the in-app logo, redrawn
+    for small sizes.
+
+    Two changes from the header version, both for legibility at 16px:
+    the bars are proportionally much thicker (the original 2.4/26 units
+    renders under 1.5px and smudges), and they are solid white rather than
+    fading the outer two — at this scale reduced opacity reads as blur, not
+    as depth. The mark fills ~63% of the plate height so it does not look
+    lost inside the rounded square.
+  -->
+  <rect width="32" height="32" rx="7" fill="#2a78d6"/>
+  <g fill="#ffffff">
+    <rect x="5.5"  y="15" width="5" height="11" rx="2.5"/>
+    <rect x="13.5" y="6"  width="5" height="20" rx="2.5"/>
+    <rect x="21.5" y="11" width="5" height="15" rx="2.5"/>
+  </g>
+</svg>
