@@ -490,44 +490,29 @@ Do not switch to live keys without authorisation from the merchant account owner
 
 ## Deployment
 
-The frontend is static; the backend needs a Node runtime with a writable disk for
-DuckDB files.
+Full walkthrough in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — Railway,
+Fly.io, and a plain VPS, with the gotchas that actually bite.
 
-### Backend (Fly.io, Railway, Render, or any container host)
-
-```bash
-docker build -f apps/api/Dockerfile -t voicequery-api .
-```
-
-- attach a **persistent volume** at `DATA_DIR` (default `/data`)
-- set `DATABASE_URL`, `SESSION_SECRET`, `CORS_ORIGINS`, `COOKIE_SECURE=true`
-- add `ANTHROPIC_API_KEY` and the Stripe variables when ready
-- health check: `GET /api/health`
-
-Serverless platforms are a poor fit: DuckDB needs local disk and warm instances.
-Use a long-running container.
-
-### Frontend (Vercel, Netlify, Cloudflare Pages)
+The short version: **one container, one domain.** The API serves the built
+frontend from the same origin, so the `SameSite=Lax` session cookie works
+unchanged and there is no CORS to configure. It needs a Postgres database and
+a mounted volume for the DuckDB dataset files, which rules out serverless
+platforms — those have no persistent filesystem.
 
 ```bash
-npm run build --workspace @voicequery/web   # → apps/web/dist
+docker build -f apps/api/Dockerfile -t voicequery .
 ```
 
-Set `VITE_API_BASE` to your API origin at build time, or serve both from one
-domain and leave it empty.
-
-**Cookies across origins.** The session cookie is `SameSite=Lax`, which is not
-sent on cross-site requests. Either serve the API and web app from the same
-site (recommended — put the API behind `/api` on the same domain), or change the
-cookie to `SameSite=None; Secure` in `apps/api/src/auth/session.ts` and keep the
-CORS allowlist tight.
-
-### Whole stack via compose
-
-```bash
-SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))") \
-  docker compose --profile full up --build
 ```
+DATABASE_URL     required
+SESSION_SECRET   required, generated — the server refuses the dev default
+COOKIE_SECURE    true
+DATA_DIR         a mounted volume, or uploads die on every deploy
+```
+
+Verify with `GET /api/health`: it should report `"driver":"postgres"`. If it
+says `pglite`, `DATABASE_URL` never reached the container and data will be
+lost on the next deploy.
 
 ---
 

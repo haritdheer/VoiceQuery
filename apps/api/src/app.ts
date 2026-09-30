@@ -4,6 +4,10 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fastifyStatic from '@fastify/static';
 import type { AppConfigResponse } from '@voicequery/shared';
 import { config } from './config/env.ts';
 import { type Db } from './db/client.ts';
@@ -140,11 +144,58 @@ export async function buildApp(options: BuildOptions) {
   await app.register(byokRoutes);
   await app.register(billingRoutes);
 
+  /* ------------------------- single-origin frontend ----------------------- */
+
+  /*
+   * Serving the built SPA from the API keeps everything on one origin. That
+   * matters more than it looks: the session cookie is SameSite=Lax, which a
+   * browser will not send on a cross-site request, so a split deployment
+   * would force SameSite=None — a real weakening — or a reverse proxy in
+   * front of both. One service avoids the choice, and removes CORS entirely.
+   *
+   * Absent in development, where Vite serves the frontend and proxies /api.
+   */
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const webDist = path.resolve(here, '..', cfg.WEB_DIST_DIR);
+  const serveWeb = existsSync(path.join(webDist, 'index.html'));
+
+  if (serveWeb) {
+    await app.register(fastifyStatic, { root: webDist });
+
+    // Cache policy set here rather than through the plugin's setHeaders hook,
+    // whose callback argument differs between raw response and FastifyReply
+    // across versions. Keying off the URL is unambiguous.
+    //
+    // Vite emits content-hashed asset filenames, so those are immutable.
+    // index.html must never be cached, or a deploy leaves returning visitors
+    // pinned to the previous bundle and pointed at assets that no longer exist.
+    app.addHook('onSend', async (request, reply) => {
+      if (request.url.startsWith('/api/')) return;
+      if (request.url.startsWith('/assets/')) {
+        reply.header('cache-control', 'public, max-age=31536000, immutable');
+      } else {
+        reply.header('cache-control', 'no-cache');
+      }
+    });
+    logger.info({ webDist }, 'serving frontend from the API');
+  }
+
   /* --------------------------- error handling ---------------------------- */
 
-  app.setNotFoundHandler((request, reply) =>
-    sendError(reply, 404, 'not_found', `No route for ${request.method} ${request.url}.`),
-  );
+  app.setNotFoundHandler((request, reply) => {
+    // Client-side routes (/app) must fall through to the SPA shell, but an
+    // unknown /api path is a real 404 and must stay JSON — returning HTML
+    // there would turn a typo into a confusing parse error in the client.
+    if (
+      serveWeb &&
+      request.method === 'GET' &&
+      !request.url.startsWith('/api/') &&
+      (request.headers.accept ?? '').includes('text/html')
+    ) {
+      return reply.header('cache-control', 'no-cache').sendFile('index.html');
+    }
+    return sendError(reply, 404, 'not_found', `No route for ${request.method} ${request.url}.`);
+  });
 
   app.setErrorHandler((error: unknown, request, reply) => {
     const e = error as { statusCode?: number; code?: string };

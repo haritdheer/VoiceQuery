@@ -55,6 +55,14 @@ const EnvSchema = z.object({
   AI_TIMEOUT_MS: int(60_000),
   AI_MAX_OUTPUT_TOKENS: int(4_000),
 
+  /**
+   * Directory holding the built frontend. When present, the API serves it
+   * from the same origin, which is what lets the SameSite=Lax session cookie
+   * work without weakening it to SameSite=None for a cross-site setup.
+   * Defaults to the workspace build output.
+   */
+  WEB_DIST_DIR: z.string().default('../web/dist'),
+
   /* -------------------------------- datasets -------------------------------- */
   DATA_DIR: z.string().default('.data'),
   MAX_UPLOAD_BYTES: int(10 * 1024 * 1024),

@@ -1,7 +1,10 @@
-# Local Postgres for development, and an optional full-stack run.
+# Local production-shaped stack.
 #
-#   docker compose up -d db          # just the database (recommended for dev)
-#   docker compose --profile full up # database + API + web
+#   docker compose up -d db     # just Postgres, for `npm run dev`
+#   docker compose --profile full up --build
+#
+# The app image serves the API and the built frontend from one origin, so
+# there is no separate web container and no CORS to configure.
 services:
   db:
     image: postgres:17-alpine
@@ -20,7 +23,7 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  app:
     profiles: ['full']
     build:
       context: .
@@ -33,32 +36,24 @@ services:
       NODE_ENV: production
       PORT: '8787'
       DATABASE_URL: postgres://voicequery:voicequery@db:5432/voicequery
-      # Override these before exposing the stack to anyone else.
-      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in your .env}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      SESSION_SECRET: ${SESSION_SECRET:?generate one - see .env.example}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Same origin, so CORS is unused. Kept for a split deployment.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8787}
+      AI_PROVIDER: ${AI_PROVIDER:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       CREDIT_PACKAGES: ${CREDIT_PACKAGES:-[]}
       DATA_DIR: /data
     volumes:
-      # Dataset files are ephemeral by design but should survive a restart.
+      # DuckDB dataset files. Ephemeral by design, but must survive a restart.
       - datasets:/data
     ports:
       - '8787:8787'
-
-  web:
-    profiles: ['full']
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        VITE_API_BASE: ${VITE_API_BASE:-}
-    restart: unless-stopped
-    depends_on:
-      - api
-    ports:
-      - '5173:80'
 
 volumes:
   pgdata:

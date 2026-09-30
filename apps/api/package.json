@@ -20,6 +20,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/multipart": "^10.1.2",
     "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.5",
     "@voicequery/shared": "*",
     "fastify": "^5.12.5",
     "node-sql-parser": "^5.4.0",
