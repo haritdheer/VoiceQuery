@@ -1,0 +1,206 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * Both themes are selected rather than derived: the dark values are their own
+ * steps against the dark surface, not an inverted copy of the light ones. The
+ * chart series colours are the validated categorical palette — see
+ * docs/ARCHITECTURE.md for the validation output.
+ */
+
+@theme {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: light;
+
+  --surface-0: #f7f7f5;
+  --surface-1: #fcfcfb;
+  --surface-2: #f1f1ee;
+  --surface-raised: #ffffff;
+
+  --border-subtle: #e4e4df;
+  --border-strong: #cfcfc8;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #86857f;
+
+  --accent: #2a78d6;
+  --accent-hover: #1f63b8;
+  --accent-soft: #e8f0fb;
+  --on-accent: #ffffff;
+
+  --good: #1e7a4c;
+  --warning: #9a6700;
+  --critical: #c0332f;
+  --good-soft: #e6f4ec;
+  --warning-soft: #fdf3dc;
+  --critical-soft: #fcebea;
+
+  /* Validated categorical palette — light steps. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  --grid: #e8e8e3;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232322;
+    --surface-raised: #222221;
+
+    --border-subtle: #33332f;
+    --border-strong: #46463f;
+
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8d8c84;
+
+    --accent: #3987e5;
+    --accent-hover: #5a9dea;
+    --accent-soft: #16273c;
+    --on-accent: #ffffff;
+
+    --good: #4cae7e;
+    --warning: #d6a031;
+    --critical: #e66767;
+    --good-soft: #14291f;
+    --warning-soft: #2c2415;
+    --critical-soft: #2e1a1a;
+
+    /* Same hues, stepped for the dark surface. */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+
+    --grid: #2d2d2a;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --surface-raised: #222221;
+
+  --border-subtle: #33332f;
+  --border-strong: #46463f;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8d8c84;
+
+  --accent: #3987e5;
+  --accent-hover: #5a9dea;
+  --accent-soft: #16273c;
+  --on-accent: #ffffff;
+
+  --good: #4cae7e;
+  --warning: #d6a031;
+  --critical: #e66767;
+  --good-soft: #14291f;
+  --warning-soft: #2c2415;
+  --critical-soft: #2e1a1a;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  --grid: #2d2d2a;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible, consistent keyboard focus everywhere. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Screen-reader-only text that still receives focus when tabbed to. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+@keyframes vq-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.vq-pulse {
+  animation: vq-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes vq-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.vq-rise {
+  animation: vq-rise 0.28s ease-out both;
+}
+
+/* Recharts paints its own focus ring; ours is enough. */
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}

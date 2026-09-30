@@ -1,0 +1,24 @@
+{
+  "name": "voicequery",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=20.11" },
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm run dev -w @voicequery/api",
+    "dev:web": "npm run dev -w @voicequery/web",
+    "build": "npm run build -w @voicequery/shared && npm run build -w @voicequery/api && npm run build -w @voicequery/web",
+    "test": "npm run test -w @voicequery/api && npm run test -w @voicequery/web",
+    "test:api": "npm run test -w @voicequery/api",
+    "test:web": "npm run test -w @voicequery/web",
+    "typecheck": "npm run typecheck -w @voicequery/shared && npm run typecheck -w @voicequery/api && npm run typecheck -w @voicequery/web",
+    "db:migrate": "npm run db:migrate -w @voicequery/api",
+    "db:seed": "npm run db:seed -w @voicequery/api"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3"
+  }
+}

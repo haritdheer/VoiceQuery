@@ -1,0 +1,65 @@
+# Local Postgres for development, and an optional full-stack run.
+#
+#   docker compose up -d db          # just the database (recommended for dev)
+#   docker compose --profile full up # database + API + web
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: voicequery
+      POSTGRES_PASSWORD: voicequery
+      POSTGRES_DB: voicequery
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U voicequery -d voicequery']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: '8787'
+      DATABASE_URL: postgres://voicequery:voicequery@db:5432/voicequery
+      # Override these before exposing the stack to anyone else.
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in your .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      CREDIT_PACKAGES: ${CREDIT_PACKAGES:-[]}
+      DATA_DIR: /data
+    volumes:
+      # Dataset files are ephemeral by design but should survive a restart.
+      - datasets:/data
+    ports:
+      - '8787:8787'
+
+  web:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '5173:80'
+
+volumes:
+  pgdata:
+  datasets:
