@@ -48,4 +48,7 @@ EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s \
   CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["npx", "tsx", "apps/api/src/server.ts"]
+# The binary directly, not `npx`: if tsx were ever missing from the image
+# npx would silently try to fetch it at boot, turning a packaging mistake
+# into a slow mystery instead of an immediate, obvious failure.
+CMD ["node_modules/.bin/tsx", "apps/api/src/server.ts"]

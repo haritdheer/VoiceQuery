@@ -45,8 +45,10 @@ Postgres, the container, and a volume all in one project. Roughly ten minutes.
 
 4. **The build is pinned by `railway.json`** at the repo root, which sets the
    Dockerfile builder and the healthcheck. Without it Railway autodetects a
-   Node app, runs `npm start`, and never builds the frontend — you get a
-   working API serving no UI.
+   Node app and builds it itself. That fallback now works too — the repo root
+   has both a `build` script (which produces the frontend) and a `start`
+   script — but the Dockerfile is the supported path and the one the compose
+   file and other hosts share.
 5. **Add a volume**: *Settings → Volumes → New Volume*, mount path `/data`.
    Without this, uploaded datasets vanish on every redeploy.
 6. **Set the remaining variables**:
@@ -208,6 +210,11 @@ test mode, and going live needs the merchant account owner's authorisation.
 not set. On Railway that means you did not add the
 `${{ Postgres.DATABASE_URL }}` reference to the *app* service — adding the
 database alone is not enough.
+
+**`sh: 1: tsx: not found`.** `tsx` executes the server, so it is a runtime
+dependency, not a dev one — a production install (`--omit=dev`) that treats
+it as a dev dependency produces an image with no way to start. It lives in
+`dependencies` for this reason; do not move it.
 
 **A working API with no UI.** The host built the app itself instead of using
 the Dockerfile, so the frontend build stage never ran. Check the build log:

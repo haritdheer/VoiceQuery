@@ -3,13 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
-  "engines": { "node": ">=20.11" },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
   "scripts": {
     "dev": "npm-run-all --parallel dev:api dev:web",
     "dev:api": "npm run dev -w @voicequery/api",
     "dev:web": "npm run dev -w @voicequery/web",
     "build": "npm run build -w @voicequery/shared && npm run build -w @voicequery/api && npm run build -w @voicequery/web",
+    "start": "npm run start -w @voicequery/api",
     "test": "npm run test -w @voicequery/api && npm run test -w @voicequery/web",
     "test:api": "npm run test -w @voicequery/api",
     "test:web": "npm run test -w @voicequery/web",
