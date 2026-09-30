@@ -178,6 +178,17 @@ export async function buildApp(options: BuildOptions) {
       }
     });
     logger.info({ webDist }, 'serving frontend from the API');
+  } else if (cfg.isProd) {
+    // In development this is normal — Vite serves the frontend. In production
+    // it means the image was built without the frontend build stage, and the
+    // only symptom otherwise is a bare JSON 404 at "/", which reads like a
+    // routing bug rather than a packaging one. Say so at boot instead.
+    logger.warn(
+      { webDist },
+      'no frontend found: "/" will return a JSON 404. The image was built ' +
+        'without the web build stage — check the builder is the Dockerfile ' +
+        'at apps/api/Dockerfile, not an autodetected Node build.',
+    );
   }
 
   /* --------------------------- error handling ---------------------------- */
