@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { AppConfigResponse, DatasetDetail, DatasetSummary } from '@voicequery/shared';
 import { Alert, Badge, Button, Card, Disclosure, cx } from './ui.tsx';
+import { UploadCsvModal } from './UploadCsvModal.tsx';
 import { formatBytes, formatCell, hoursUntil } from '../lib/format.ts';
 import { api, ApiRequestError } from '../lib/api.ts';
 
@@ -26,32 +27,34 @@ export function DatasetPanel({
   onUploaded: (dataset: DatasetDetail) => void;
   onDeleted: (id: string) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  async function upload(file: File) {
+  /** Resolves to whether the dataset landed, so the dialog knows to close. */
+  async function upload(file: File): Promise<boolean> {
     setError(null);
     setHint(null);
 
     // Fail fast on obvious problems so the user is not left waiting.
     if (!/\.csv$/i.test(file.name)) {
       setError('Only .csv files are supported.');
-      return;
+      return false;
     }
     if (file.size > limits.maxUploadBytes) {
       setError(
         `That file is ${formatBytes(file.size)}, above the ${formatBytes(limits.maxUploadBytes)} limit.`,
       );
-      return;
+      return false;
     }
 
     setUploading(true);
     try {
       const dataset = await api.uploadCsv(file);
       onUploaded(dataset);
+      return true;
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);
@@ -60,10 +63,18 @@ export function DatasetPanel({
       } else {
         setError('The upload failed. Please try again.');
       }
+      return false;
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  function openUploadDialog() {
+    // A message left over from a previous attempt would read as a failure of
+    // the upload the user is only just starting.
+    setError(null);
+    setHint(null);
+    setUploadOpen(true);
   }
 
   async function remove(id: string, name: string) {
@@ -179,22 +190,11 @@ export function DatasetPanel({
               : 'border-[var(--border-strong)]',
           )}
         >
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="sr-only"
-            id="vq-csv-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void upload(file);
-            }}
-          />
           <Button
             variant="secondary"
             size="sm"
             loading={uploading}
-            onClick={() => fileRef.current?.click()}
+            onClick={openUploadDialog}
           >
             {uploading ? 'Processing' : 'Upload CSV'}
           </Button>
@@ -209,7 +209,8 @@ export function DatasetPanel({
 
         )}
 
-        {error && (
+        {/* The dialog shows the same message; only one of the two is visible. */}
+        {error && !uploadOpen && (
           <div className="mt-2">
             <Alert tone="critical">
               {error}
@@ -218,6 +219,20 @@ export function DatasetPanel({
           </div>
         )}
       </section>
+
+      <UploadCsvModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        limits={limits}
+        uploading={uploading}
+        error={error}
+        hint={hint}
+        onFile={(file) => {
+          void upload(file).then((ok) => {
+            if (ok) setUploadOpen(false);
+          });
+        }}
+      />
 
       {/* ------------------------------- schema ------------------------------ */}
       {detail && (

@@ -126,6 +126,21 @@ export function Badge({
 
 /* --------------------------------- Modal ---------------------------------- */
 
+// Every native focusable, minus anything that has opted out with tabindex="-1".
+// The exclusion has to be repeated per tag: `input` matches by element name, so
+// a trailing `[tabindex]:not(...)` clause does nothing to exclude it. Without
+// this a visually hidden file input is the first thing the dialog focuses.
+const FOCUSABLE = [
+  'button',
+  '[href]',
+  'input',
+  'select',
+  'textarea',
+  '[tabindex]',
+]
+  .map((sel) => `${sel}:not([tabindex="-1"])`)
+  .join(', ');
+
 /**
  * Accessible dialog: focus moves in on open, Escape closes, a focus trap keeps
  * Tab inside, and focus returns to the trigger on close.
@@ -137,6 +152,7 @@ export function Modal({
   description,
   children,
   closeOnBackdrop = true,
+  size = 'md',
 }: {
   open: boolean;
   onClose: () => void;
@@ -144,6 +160,8 @@ export function Modal({
   description?: string;
   children: ReactNode;
   closeOnBackdrop?: boolean;
+  /** `lg` suits content with a table or a long list. */
+  size?: 'md' | 'lg';
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -161,7 +179,7 @@ export function Modal({
 
     const panel = panelRef.current;
     const focusable = panel?.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      FOCUSABLE,
     );
     focusable?.[0]?.focus();
 
@@ -175,7 +193,7 @@ export function Modal({
 
       const items = Array.from(
         panel.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          FOCUSABLE,
         ),
       ).filter((el) => !el.hasAttribute('disabled'));
       if (items.length === 0) return;
@@ -217,7 +235,14 @@ export function Modal({
         aria-modal="true"
         aria-labelledby="vq-modal-title"
         aria-describedby={description ? 'vq-modal-desc' : undefined}
-        className="vq-rise w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-2xl"
+        className={cx(
+          'vq-rise w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-2xl',
+          // Taller content scrolls inside the dialog rather than running off
+          // the bottom of the viewport, where the action buttons would be
+          // unreachable on a short window.
+          'max-h-[calc(100dvh-2rem)] overflow-y-auto',
+          size === 'lg' ? 'max-w-2xl' : 'max-w-lg',
+        )}
       >
         <h2 id="vq-modal-title" className="text-lg font-semibold text-[var(--text-primary)]">
           {title}

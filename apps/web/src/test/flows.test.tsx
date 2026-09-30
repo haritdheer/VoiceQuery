@@ -552,9 +552,34 @@ describe('checkout', () => {
 /* -------------------------------- CSV upload ------------------------------- */
 
 describe('CSV upload', () => {
-  it('rejects a non-CSV file before it reaches the network', async () => {
-    renderDashboard(SESSION(2));
+  /**
+   * The file input lives in the format dialog, which is the only way in from
+   * the sidebar button — so every upload test opens it first.
+   */
+  async function openUploadDialog(user: ReturnType<typeof userEvent.setup>) {
     await screen.findByText('Sample: Retail Sales 2024');
+    await user.click(screen.getByRole('button', { name: 'Upload CSV' }));
+    return within(await screen.findByRole('dialog'));
+  }
+
+  it('explains the expected format before asking for a file', async () => {
+    const user = userEvent.setup();
+    renderDashboard(SESSION(2));
+    const dialog = await openUploadDialog(user);
+
+    // The worked example and the rules that the parser actually enforces.
+    expect(dialog.getByRole('columnheader', { name: 'order_date' })).toBeInTheDocument();
+    expect(dialog.getByRole('cell', { name: '$1,240.50' })).toBeInTheDocument();
+    expect(dialog.getByText(/The first row must be the column names/)).toBeInTheDocument();
+    expect(dialog.getByText(/no totals row at the bottom/)).toBeInTheDocument();
+    expect(dialog.getByText(/Blank, NULL, NA and - are all read as missing/)).toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Choose a CSV file' })).toBeInTheDocument();
+  });
+
+  it('rejects a non-CSV file before it reaches the network', async () => {
+    const user = userEvent.setup();
+    renderDashboard(SESSION(2));
+    await openUploadDialog(user);
 
     // userEvent.upload filters by the input's accept attribute, so a .json
     // file would never reach the handler. Fire the change directly to prove
@@ -577,13 +602,15 @@ describe('CSV upload', () => {
     );
 
     renderDashboard(SESSION(2));
-    await screen.findByText('Sample: Retail Sales 2024');
+    await openUploadDialog(user);
 
     const input = document.getElementById('vq-csv-input') as HTMLInputElement;
     await user.upload(input, new File(['a,b\n'], 'bad.csv', { type: 'text/csv' }));
 
     expect(await screen.findByText('No header row was found.')).toBeInTheDocument();
     expect(screen.getByText('The first row must contain column names.')).toBeInTheDocument();
+    // The dialog stays open on failure so the guidance is still on screen.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('adds an uploaded dataset and shows its inferred schema and warnings', async () => {
@@ -601,7 +628,7 @@ describe('CSV upload', () => {
     vi.mocked(api.dataset).mockResolvedValue({ dataset: uploaded, exampleQuestions: [] });
 
     renderDashboard(SESSION(2));
-    await screen.findByText('Sample: Retail Sales 2024');
+    await openUploadDialog(user);
 
     const input = document.getElementById('vq-csv-input') as HTMLInputElement;
     await user.upload(input, new File(['a,b\n1,2'], 'my-sales.csv', { type: 'text/csv' }));
@@ -610,6 +637,8 @@ describe('CSV upload', () => {
     expect(
       await screen.findByText('Duplicate column "Amount" was renamed to "amount_2".'),
     ).toBeInTheDocument();
+    // …and closes on success, revealing the schema it just loaded.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('states the upload limits and the expiry policy', async () => {
