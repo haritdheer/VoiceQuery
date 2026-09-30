@@ -7,6 +7,7 @@ import { AuthDialog } from './components/AuthDialog.tsx';
 import { UpgradeModal } from './components/UpgradeModal.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { GuestNudgeModal } from './components/GuestNudgeModal.tsx';
+import { AppFooter } from './components/AppFooter.tsx';
 import { Alert, Spinner } from './components/ui.tsx';
 
 type Route = 'landing' | 'app';
@@ -137,6 +138,8 @@ export default function App() {
 
   if (bootError) {
     return (
+      <>
+        <AppFooter />
       <div className="flex h-full items-center justify-center p-6">
         <div className="max-w-md">
           <Alert tone="critical" title="Cannot connect">
@@ -148,15 +151,19 @@ export default function App() {
           </Alert>
         </div>
       </div>
+      </>
     );
   }
 
   if (!config || !session) {
     return (
-      <div className="flex h-full items-center justify-center text-[var(--text-muted)]">
-        <Spinner className="h-6 w-6" />
-        <span className="sr-only">Loading</span>
-      </div>
+      <>
+        <div className="flex h-full items-center justify-center text-[var(--text-muted)]">
+          <Spinner className="h-6 w-6" />
+          <span className="sr-only">Loading</span>
+        </div>
+        <AppFooter />
+      </>
     );
   }
 
@@ -201,6 +208,7 @@ export default function App() {
         <Landing
           config={config}
           signedIn={signedIn}
+          realAiActive={session.aiMode !== 'demo'}
           onTryDemo={() => void tryDemo()}
           onSignIn={() => {
             setAuthMode('login');
@@ -243,6 +251,8 @@ export default function App() {
         freeCredits={config.freeCredits}
         onByokConnected={() => void refreshSession()}
       />
+
+      <AppFooter />
 
       {session.user && (
         <SettingsPanel

@@ -1,5 +1,6 @@
 import type { AppConfigResponse } from '@voicequery/shared';
 import { Badge, Button, Card } from '../components/ui.tsx';
+import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
 
 const STEPS = [
   {
@@ -36,14 +37,22 @@ export function Landing({
   onTryDemo,
   onSignIn,
   signedIn,
+  realAiActive = false,
 }: {
   config: AppConfigResponse;
   onTryDemo: () => void;
   onSignIn: () => void;
   signedIn: boolean;
+  /**
+   * True when this visitor's questions reach a real model — because they
+   * connected their own key, or the deployment has a platform one. The
+   * deployment-level `demoMode` flag alone would keep claiming "demo" at
+   * someone already getting real answers.
+   */
+  realAiActive?: boolean;
 }) {
   return (
-    <div className="min-h-full bg-[var(--surface-0)]">
+    <div className={`min-h-full bg-[var(--surface-0)] ${FOOTER_SPACER_CLASS}`}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[var(--accent)] focus:px-4 focus:py-2 focus:text-[var(--on-accent)]"
@@ -78,7 +87,7 @@ export function Landing({
         {/* --------------------------------- hero -------------------------------- */}
         <section className="mx-auto max-w-6xl px-4 pt-10 pb-16 sm:px-6 sm:pt-16">
           <div className="max-w-3xl">
-            {config.demoMode && (
+            {config.demoMode && !realAiActive && (
               <div className="mb-4">
                 <Badge tone="warning">
                   Demo mode — answers come from a local stand-in, not an AI model
@@ -222,15 +231,6 @@ ORDER BY total_revenue DESC LIMIT 10`}</code>
             VoiceQuery is a portfolio demonstration project. Please do not upload confidential
             data. Uploaded files are deleted automatically after{' '}
             {config.limits.datasetTtlHours} hours.
-          </p>
-
-          <p className="mt-4 border-t border-[var(--border-subtle)] pt-4 text-xs text-[var(--text-muted)]">
-            Conceived and built by{' '}
-            <span className="font-medium text-[var(--text-secondary)]">Harit</span>, in
-            collaboration with my buddy{' '}
-            <span className="font-medium text-[var(--text-secondary)]">Claude</span>{' '}
-            <span aria-hidden="true">💙</span>
-            <span className="sr-only">(with appreciation)</span>
           </p>
         </div>
       </footer>

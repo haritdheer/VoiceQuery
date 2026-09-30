@@ -57,6 +57,7 @@ const { UpgradeModal } = await import('../components/UpgradeModal.tsx');
 const { Composer } = await import('../components/Composer.tsx');
 const { Landing } = await import('../pages/Landing.tsx');
 const { AuthDialog } = await import('../components/AuthDialog.tsx');
+const { AppFooter } = await import('../components/AppFooter.tsx');
 
 /* --------------------------------- fixtures -------------------------------- */
 
@@ -954,5 +955,81 @@ describe('provider selection', () => {
 
     await user.selectOptions(screen.getByLabelText('Provider'), 'openrouter');
     expect(screen.getByText(/pay-as-you-go/)).toBeInTheDocument();
+  });
+});
+
+/* ---------------------- header honesty about who answers ------------------ */
+
+/**
+ * The header once carried a "Demo mode" badge driven by `config.demoMode` —
+ * whether the *server* had a platform key. That stayed lit even after a user
+ * connected their own key and was getting real AI answers, which is simply a
+ * false statement. Everything shown now derives from `session.aiMode`.
+ */
+describe('header reflects who is actually answering', () => {
+  const DEMO_DEPLOYMENT = { ...CONFIG, demoMode: true, creditsEnabled: false };
+
+  it('says nothing about demo mode once the user’s own key is connected', async () => {
+    render(
+      <Dashboard
+        session={SESSION(0, 'byok')}
+        config={DEMO_DEPLOYMENT}
+        onOpenSettings={noop}
+        onOutOfCredits={noop}
+        onSessionRefresh={noop}
+        onSignOut={noop}
+      />,
+    );
+
+    expect(await screen.findByText('Your API key')).toBeInTheDocument();
+    expect(screen.queryByText('Demo mode')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo answers')).not.toBeInTheDocument();
+    expect(screen.queryByText(/not signed in/)).not.toBeInTheDocument();
+  });
+
+  it('still labels demo answers when no key is connected', async () => {
+    render(
+      <Dashboard
+        session={SESSION(0, 'demo', false)}
+        config={DEMO_DEPLOYMENT}
+        onOpenSettings={noop}
+        onOutOfCredits={noop}
+        onSessionRefresh={noop}
+        onSignOut={noop}
+      />,
+    );
+    expect(await screen.findByText('Demo answers')).toBeInTheDocument();
+  });
+
+  it('drops the landing-page demo banner for a BYOK visitor', () => {
+    const { rerender } = render(
+      <Landing config={DEMO_DEPLOYMENT} signedIn onTryDemo={noop} onSignIn={noop} />,
+    );
+    expect(screen.getByText(/answers come from a local stand-in/)).toBeInTheDocument();
+
+    rerender(
+      <Landing config={DEMO_DEPLOYMENT} signedIn realAiActive onTryDemo={noop} onSignIn={noop} />,
+    );
+    expect(screen.queryByText(/answers come from a local stand-in/)).not.toBeInTheDocument();
+  });
+});
+
+describe('persistent credit footer', () => {
+  it('names both authors', () => {
+    render(<AppFooter />);
+    expect(screen.getByText('Harit')).toBeInTheDocument();
+    expect(screen.getByText('Claude')).toBeInTheDocument();
+  });
+
+  it('is fixed to the viewport so it survives scrolling', () => {
+    const { container } = render(<AppFooter />);
+    const footer = container.querySelector('footer')!;
+    expect(footer.className).toContain('fixed');
+    expect(footer.className).toContain('bottom-0');
+  });
+
+  it('hides the decorative heart from screen readers', () => {
+    const { container } = render(<AppFooter />);
+    expect(container.querySelector('[aria-hidden="true"]')?.textContent).toBe('💙');
   });
 });

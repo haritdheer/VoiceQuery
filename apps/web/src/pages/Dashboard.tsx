@@ -12,6 +12,7 @@ import { Composer } from '../components/Composer.tsx';
 import { DatasetPanel } from '../components/DatasetPanel.tsx';
 import { MessageCard, PendingCard } from '../components/MessageCard.tsx';
 import { api, ApiRequestError } from '../lib/api.ts';
+import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
 
 /**
  * The working surface: dataset selection on the left, conversation on the right.
@@ -249,7 +250,7 @@ export function Dashboard({
   );
 
   return (
-    <div className="flex h-full flex-col bg-[var(--surface-0)]">
+    <div className={`flex h-full flex-col bg-[var(--surface-0)] ${FOOTER_SPACER_CLASS}`}>
       {/* --------------------------------- header -------------------------------- */}
       <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-1)]">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
@@ -267,11 +268,14 @@ export function Dashboard({
 
           <span className="text-sm font-semibold text-[var(--text-primary)]">VoiceQuery</span>
 
-          {config.demoMode && (
-            <Badge tone="warning" title="No AI provider configured — answers are generated locally and labelled simulated.">
-              Demo mode
-            </Badge>
-          )}
+          {/*
+            No deployment-level "Demo mode" badge here. It keyed off
+            config.demoMode — whether the *server* has a platform key — which
+            stays true even once the user connects their own key and is
+            getting real AI answers. The badges on the right are derived from
+            session.aiMode instead, so they always describe what is actually
+            answering this user's questions.
+          */}
 
           <div className="ml-auto flex items-center gap-2">
             {isGuest ? (
