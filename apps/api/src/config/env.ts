@@ -33,6 +33,9 @@ const EnvSchema = z.object({
    * the project runs with no external services. Production requires it.
    */
   DATABASE_URL: z.string().optional(),
+  /** Aliases some platforms use instead of DATABASE_URL (Vercel, Neon). */
+  POSTGRES_URL: z.string().optional(),
+  POSTGRESQL_URL: z.string().optional(),
 
   /** Signing key for session cookies. Must be set in production. */
   SESSION_SECRET: z.string().default('dev-only-insecure-session-secret-change-me'),
@@ -157,12 +160,16 @@ function load() {
     );
   }
 
+  // Accept the common aliases so the app works on platforms that name the
+  // variable differently. Does not help where the value simply is not set.
+  const databaseUrl = e.DATABASE_URL || e.POSTGRES_URL || e.POSTGRESQL_URL || undefined;
+
   const isProd = e.NODE_ENV === 'production';
   if (isProd) {
     // These are the two things every first deployment gets wrong, so the
     // messages say how to fix them rather than only naming the variable —
     // this text is the whole of what someone sees in a crashed deploy log.
-    if (!e.DATABASE_URL) {
+    if (!databaseUrl) {
       throw new Error(
         [
           'DATABASE_URL is required in production, and no value was found.',
@@ -255,6 +262,7 @@ function load() {
 
   return Object.freeze({
     ...e,
+    DATABASE_URL: databaseUrl,
     isProd,
     isTest: e.NODE_ENV === 'test',
     corsOrigins: e.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
