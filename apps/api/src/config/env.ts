@@ -159,9 +159,42 @@ function load() {
 
   const isProd = e.NODE_ENV === 'production';
   if (isProd) {
-    if (!e.DATABASE_URL) throw new Error('DATABASE_URL is required in production.');
+    // These are the two things every first deployment gets wrong, so the
+    // messages say how to fix them rather than only naming the variable —
+    // this text is the whole of what someone sees in a crashed deploy log.
+    if (!e.DATABASE_URL) {
+      throw new Error(
+        [
+          'DATABASE_URL is required in production, and no value was found.',
+          '',
+          '  This is almost always an unset variable rather than a bad one.',
+          '  Most platforms do NOT inject a database URL into other services',
+          '  automatically — it has to be referenced explicitly:',
+          '',
+          '    Railway   add a variable to THIS service:',
+          '                DATABASE_URL = ${{ Postgres.DATABASE_URL }}',
+          '              using the database service name from the sidebar',
+          '    Fly.io    fly postgres attach <db-app-name>',
+          '    Docker    see docker-compose.yml',
+          '',
+          '  Refusing to start on purpose: without it the server would fall',
+          '  back to an embedded database and silently lose every signup and',
+          '  upload on the next deploy.',
+        ].join('\n'),
+      );
+    }
     if (e.SESSION_SECRET.startsWith('dev-only-')) {
-      throw new Error('SESSION_SECRET must be set to a strong random value in production.');
+      throw new Error(
+        [
+          'SESSION_SECRET is still the insecure development default.',
+          '',
+          '  Generate one and set it as an environment variable:',
+          '    node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"',
+          '',
+          '  It signs session cookies. A known value means anyone can forge',
+          '  a session for any account.',
+        ].join('\n'),
+      );
     }
   }
 

@@ -27,14 +27,29 @@ front of both. One service avoids the choice and removes CORS entirely.
 Postgres, the container, and a volume all in one project. Roughly ten minutes.
 
 1. **New project → Deploy from GitHub repo**, pick your VoiceQuery repo.
-2. **Add Postgres**: *New → Database → PostgreSQL*. Railway injects
-   `DATABASE_URL` automatically.
-3. **Point the build at the Dockerfile.** In the service's *Settings → Build*,
-   set the Dockerfile path to `apps/api/Dockerfile` and the build context to
-   the repo root.
-4. **Add a volume**: *Settings → Volumes → New Volume*, mount path `/data`.
+2. **Add Postgres**: *New → Database → PostgreSQL*.
+
+3. **Reference the database from the app service.** This does **not** happen
+   automatically — Railway creates `DATABASE_URL` on the *Postgres* service,
+   and other services only see it if you reference it. In the app service's
+   *Variables* tab add:
+
+   ```
+   DATABASE_URL = ${{ Postgres.DATABASE_URL }}
+   ```
+
+   Substitute your database service's name as it appears in the sidebar. Miss
+   this and the deploy crashes on boot with `DATABASE_URL is required in
+   production` — deliberately, rather than falling back to an embedded
+   database and losing data on the next deploy.
+
+4. **The build is pinned by `railway.json`** at the repo root, which sets the
+   Dockerfile builder and the healthcheck. Without it Railway autodetects a
+   Node app, runs `npm start`, and never builds the frontend — you get a
+   working API serving no UI.
+5. **Add a volume**: *Settings → Volumes → New Volume*, mount path `/data`.
    Without this, uploaded datasets vanish on every redeploy.
-5. **Set variables** (*Variables* tab):
+6. **Set the remaining variables**:
 
    ```
    NODE_ENV=production
@@ -48,8 +63,8 @@ Postgres, the container, and a volume all in one project. Roughly ten minutes.
    node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
    ```
 
-6. **Generate a domain**: *Settings → Networking → Generate Domain*.
-7. Add a provider key when you want real AI answers (see below). Without one
+7. **Generate a domain**: *Settings → Networking → Generate Domain*.
+8. Add a provider key when you want real AI answers (see below). Without one
    the app runs in clearly-labelled demo mode, which is a perfectly good
    public demo.
 
@@ -188,6 +203,17 @@ test mode, and going live needs the merchant account owner's authorisation.
 ---
 
 ## Things that will bite you
+
+**Crash on boot: `DATABASE_URL is required in production`.** The variable is
+not set. On Railway that means you did not add the
+`${{ Postgres.DATABASE_URL }}` reference to the *app* service — adding the
+database alone is not enough.
+
+**A working API with no UI.** The host built the app itself instead of using
+the Dockerfile, so the frontend build stage never ran. Check the build log:
+if it shows `npm start` rather than a Docker build, the builder was not
+picked up. `railway.json` pins it; other hosts need the Dockerfile selected
+explicitly.
 
 **`driver: "pglite"` in production.** Means `DATABASE_URL` was not picked up
 and the app silently fell back to the embedded database. Data will vanish on
