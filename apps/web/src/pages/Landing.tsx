@@ -223,6 +223,15 @@ ORDER BY total_revenue DESC LIMIT 10`}</code>
             data. Uploaded files are deleted automatically after{' '}
             {config.limits.datasetTtlHours} hours.
           </p>
+
+          <p className="mt-4 border-t border-[var(--border-subtle)] pt-4 text-xs text-[var(--text-muted)]">
+            Conceived and built by{' '}
+            <span className="font-medium text-[var(--text-secondary)]">Harit</span>, in
+            collaboration with my buddy{' '}
+            <span className="font-medium text-[var(--text-secondary)]">Claude</span>{' '}
+            <span aria-hidden="true">💙</span>
+            <span className="sr-only">(with appreciation)</span>
+          </p>
         </div>
       </footer>
     </div>
