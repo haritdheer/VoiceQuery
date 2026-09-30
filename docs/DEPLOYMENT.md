@@ -65,7 +65,13 @@ Postgres, the container, and a volume all in one project. Roughly ten minutes.
    node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
    ```
 
-7. **Generate a domain**: *Settings → Networking → Generate Domain*.
+7. **Generate a domain**: *Settings → Networking → Generate Domain*. Then set
+   `PUBLIC_URL` to it (no trailing slash) — one variable that gives correct
+   defaults for the CORS allowlist and the Stripe redirect URLs, all of which
+   otherwise still point at localhost.
+
+   For a domain you own, use *Custom Domain* instead, add the CNAME Railway
+   shows you at your registrar, and point `PUBLIC_URL` at that.
 8. Add a provider key when you want real AI answers (see below). Without one
    the app runs in clearly-labelled demo mode, which is a perfectly good
    public demo.
@@ -175,9 +181,10 @@ Optional; billing stays disabled until both are set.
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 CREDIT_PACKAGES=[{"id":"pack20","name":"20 questions","credits":20,"amountMinor":900,"currency":"usd"}]
-CHECKOUT_SUCCESS_URL=https://yourdomain.com/app?checkout=success
-CHECKOUT_CANCEL_URL=https://yourdomain.com/app?checkout=cancelled
 ```
+
+The redirect URLs derive from `PUBLIC_URL`, so there is nothing extra to set
+provided that is correct.
 
 In the Stripe dashboard add an endpoint at
 `https://yourdomain.com/api/billing/webhook` subscribed to
@@ -200,6 +207,8 @@ test mode, and going live needs the merchant account owner's authorisation.
       if it says `pglite`, `DATABASE_URL` did not reach the container
 - [ ] Sign up, ask a question, upload a CSV, reload the page — the session
       should survive
+- [ ] `PUBLIC_URL` matches the domain people actually visit — otherwise a
+      Stripe checkout would return them to localhost
 - [ ] Decide whether `GUEST_MODE_ENABLED` should stay on for a public link
 
 ---

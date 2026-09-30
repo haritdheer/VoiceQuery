@@ -24,8 +24,19 @@ const EnvSchema = z.object({
   PORT: int(8787),
   HOST: z.string().default('0.0.0.0'),
 
-  /** Comma-separated list of allowed browser origins. */
-  CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  /**
+   * The public origin this deployment is reachable at, e.g.
+   * https://voicequery.up.railway.app — no trailing slash.
+   *
+   * Setting this one variable gives correct defaults for the CORS allowlist
+   * and the checkout redirect URLs, which otherwise point at localhost. That
+   * matters most for payments: a forgotten checkout URL sends a paying user
+   * to localhost after Stripe takes their money.
+   */
+  PUBLIC_URL: z.string().optional(),
+
+  /** Comma-separated browser origins. Defaults to PUBLIC_URL when set. */
+  CORS_ORIGINS: z.string().optional(),
 
   /**
    * Postgres connection string. When absent in development/test the server
@@ -123,8 +134,9 @@ const EnvSchema = z.object({
    * e.g. [{"id":"pack20","name":"20 questions","credits":20,"amountMinor":900,"currency":"usd"}]
    */
   CREDIT_PACKAGES: z.string().default('[]'),
-  CHECKOUT_SUCCESS_URL: z.string().default('http://localhost:5173/app?checkout=success'),
-  CHECKOUT_CANCEL_URL: z.string().default('http://localhost:5173/app?checkout=cancelled'),
+  /** Both default to PUBLIC_URL when it is set. */
+  CHECKOUT_SUCCESS_URL: z.string().optional(),
+  CHECKOUT_CANCEL_URL: z.string().optional(),
 
   /* ------------------------------- rate limits ------------------------------ */
   RATE_LIMIT_ANALYSIS_PER_HOUR: int(60),
@@ -163,6 +175,18 @@ function load() {
   // Accept the common aliases so the app works on platforms that name the
   // variable differently. Does not help where the value simply is not set.
   const databaseUrl = e.DATABASE_URL || e.POSTGRES_URL || e.POSTGRESQL_URL || undefined;
+
+  // One public origin drives the three settings that would otherwise still
+  // point at a developer's laptop after going live.
+  // Trailing slashes would produce "https://host//app?checkout=success".
+  const publicUrl = e.PUBLIC_URL ? e.PUBLIC_URL.replace(/\/+$/, '') : undefined;
+  const origin = publicUrl ?? 'http://localhost:5173';
+  const checkoutSuccessUrl = e.CHECKOUT_SUCCESS_URL ?? `${origin}/app?checkout=success`;
+  const checkoutCancelUrl = e.CHECKOUT_CANCEL_URL ?? `${origin}/app?checkout=cancelled`;
+  const corsOrigins = (e.CORS_ORIGINS ?? origin)
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
 
   const isProd = e.NODE_ENV === 'production';
   if (isProd) {
@@ -265,7 +289,10 @@ function load() {
     DATABASE_URL: databaseUrl,
     isProd,
     isTest: e.NODE_ENV === 'test',
-    corsOrigins: e.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean),
+    corsOrigins,
+    publicUrl,
+    CHECKOUT_SUCCESS_URL: checkoutSuccessUrl,
+    CHECKOUT_CANCEL_URL: checkoutCancelUrl,
     packages,
     demoMode,
     platformProvider,
