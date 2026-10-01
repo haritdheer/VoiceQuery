@@ -25,7 +25,6 @@ for each stage.
 - [Bring your own API key](#bring-your-own-api-key)
 - [Voice input](#voice-input)
 - [Configuration](#configuration)
-- [Payments setup](#payments-setup)
 - [Deployment](#deployment)
 - [Tests](#tests)
 - [Known limitations](#known-limitations)
@@ -103,12 +102,11 @@ a key. To rehearse that flow offline, set `DEMO_CONSUMES_CREDITS=true`.
 | Optional spoken replies (browser speech synthesis) | Working |
 | Follow-up questions with bounded conversation context | Working |
 | SQL validation + sandboxed execution | Working, tested |
-| Two free credits, transactional ledger, refunds, idempotency | Working, tested |
+| Five free questions per account, transactional ledger, refunds, idempotency | Working, tested |
 | Bring-your-own-key (Anthropic) | Working — needs a real key to exercise |
-| Stripe checkout + verified webhook credit grants | Implemented, **needs your Stripe keys** |
 | Real AI answers (Anthropic / OpenAI / OpenRouter) | Implemented, **needs a provider key** |
 
-The two items marked in bold are blocked only on credentials, not on code. Setup
+The item marked in bold is blocked only on credentials, not on code. Setup
 steps are below.
 
 ---
@@ -121,7 +119,7 @@ steps are below.
    ▼
  Fastify API (TypeScript, Node 20+)
    ├── Postgres ── users, sessions, conversations, messages,
-   │               credit ledger, purchases, webhook events, dataset metadata
+   │               credit ledger, dataset metadata
    ├── DuckDB ──── one isolated read-only file per dataset
    └── AI adapter ─ Anthropic (claude-opus-5) │ user's BYOK key │ offline demo
 ```
@@ -137,9 +135,8 @@ apps/api            Fastify backend
   src/ai            provider adapter, prompts, pipeline, demo provider
   src/credits       transactional credit ledger
   src/datasets      CSV parsing, dataset store, sample data
-  src/billing       Stripe client + webhook processing
   src/routes        HTTP endpoints
-  tests             199 backend tests
+  tests             189 backend tests
 apps/web            React frontend
 packages/shared     wire contract types shared by both
 ```
@@ -258,7 +255,6 @@ What a guest can do:
 | **Real AI answers** | no — always the demo provider | yes |
 | Upload a CSV | no | yes |
 | Connect your own API key | no | yes |
-| Buy credits | no | yes |
 
 ### The cost boundary
 
@@ -287,8 +283,14 @@ Set `GUEST_MODE_ENABLED=false` to require sign-in before the demo.
 
 ## Credits and the free allowance
 
-Each account gets exactly **two** free questions, once, at creation
-(`FREE_CREDITS`). Enforced entirely server-side.
+Each account gets exactly **five** free questions, once, at creation
+(`FREE_CREDITS`), funded by the operator's own provider key. Enforced entirely
+server-side.
+
+There is nothing to buy. When the five are gone the only way forward is to
+connect your own provider key — which is also what happens if the operator's
+key is rejected or runs out of quota mid-question. Offering a purchase that
+does not exist would be worse than offering nothing.
 
 | Event | Effect |
 |---|---|
@@ -298,7 +300,8 @@ Each account gets exactly **two** free questions, once, at creation
 | Clarification request | **refunded** — no analysis completed |
 | Viewing past results | free |
 | Retry with the same idempotency key | replays the stored response, no charge |
-| BYOK mode | no application credits consumed |
+| BYOK mode | no free questions consumed |
+| Operator's key rejected or out of quota | credit refunded, key form opened |
 | Demo mode | no credits consumed by default — it makes no provider call |
 
 How the guarantees hold:
@@ -444,47 +447,6 @@ with a readable message rather than surfacing later as a confusing bug.
 
 Production requires `DATABASE_URL` and a non-default `SESSION_SECRET`; the server
 refuses to start otherwise.
-
----
-
-## Payments setup
-
-Billing stays disabled until both `STRIPE_SECRET_KEY` and `CREDIT_PACKAGES` are
-set. Keys starting `sk_test_` put the UI into a labelled **Test mode**.
-
-1. Create a Stripe account and copy your **test** secret key.
-2. Define packages. Prices are deliberately not hardcoded anywhere in the source —
-   set them from your own measured model, speech, hosting, database and payment
-   costs:
-   ```bash
-   CREDIT_PACKAGES=[{"id":"pack20","name":"20 questions","credits":20,"amountMinor":900,"currency":"usd"}]
-   ```
-3. Forward webhooks locally:
-   ```bash
-   stripe listen --forward-to localhost:8787/api/billing/webhook
-   ```
-   Copy the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`.
-4. Test with card `4242 4242 4242 4242`, any future expiry, any CVC.
-
-Guarantees:
-
-- checkout sessions are created server-side from a **trusted package id**; the
-  browser never sends an amount
-- credits are granted **only** after signature verification — the success
-  redirect is navigation, never proof of payment
-- duplicate delivery is idempotent (`payment_events.id` is the primary key), and
-  a second event for an already-paid session grants nothing
-- expiry and async payment failure mark the purchase `cancelled`/`failed`
-- purchase history is stored and shown in Settings
-
-**Refunds and chargebacks.** Refund through the Stripe dashboard, then remove the
-granted credits with a compensating ledger entry (`admin_adjust`) so the ledger
-still reconciles. Automatic reversal on `charge.refunded` /
-`charge.dispute.created` is not implemented in v1 — deliberately, because
-deciding whether to claw back already-spent credits is a policy question, not a
-technical one.
-
-Do not switch to live keys without authorisation from the merchant account owner.
 
 ---
 

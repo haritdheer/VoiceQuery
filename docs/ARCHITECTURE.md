@@ -13,8 +13,8 @@ A short explanation of how VoiceQuery is put together and why.
  Fastify API (TypeScript, Node 20+)  ── single process
     │
     ├── Postgres          users, sessions, conversations, messages,
-    │                     credit_accounts, credit_ledger, purchases,
-    │                     payment_events, idempotency_records, datasets
+    │                     credit_accounts, credit_ledger,
+    │                     idempotency_records, datasets
     │
     ├── DuckDB            one read-only file per dataset, on local disk
     │
@@ -105,9 +105,10 @@ Three things are treated as untrusted, and each has an explicit boundary:
 2. **Model output.** The SQL is parsed and validated; the chart spec is checked
    against the actual result columns and downgraded to no chart if it references
    something that does not exist.
-3. **Webhook payloads.** Signature-verified before anything is read from them,
-   and the credit amount comes from our own purchase record rather than the
-   payload.
+3. **Provider failures.** An auth-class error is classified by whose key it
+   was: the user's own key produces an actionable message naming their
+   provider, while the operator's produces `platform_unavailable`, which the
+   client turns into the key form. The two are never conflated.
 
 ## Credit ledger design
 

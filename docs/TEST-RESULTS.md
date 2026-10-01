@@ -27,7 +27,7 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 
 ---
 
-## Backend — 199 tests
+## Backend — 189 tests
 
 | File | Tests | Covers |
 |---|---|---|
@@ -36,8 +36,8 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 | `analysis.test.ts` | 18 | pipeline, sandbox, row bounding |
 | `csv.test.ts` | 15 | parsing, inference, messy input |
 | `access.test.ts` | 13 | auth, CSRF, cross-user isolation |
-| `webhook.test.ts` | 13 | signature verification, duplicate payments |
-| `guest.test.ts` | 14 | anonymous sessions, cost boundary, restrictions, ceiling |
+| `platformFailure.test.ts` | 4 | operator key rejected: 503, refund, message hygiene |
+| `guest.test.ts` | 13 | anonymous sessions, cost boundary, restrictions, ceiling |
 | `migrate.test.ts` | 7 | fresh schema, re-runnability, upgrading an older database |
 | `providers.test.ts` | 32 | catalogue, adapter dispatch, platform selection, BYOK per provider, error wording |
 
@@ -45,7 +45,7 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 
 | Required check | Where | Result |
 |---|---|---|
-| Exactly two free credits on account creation | `credits.test.ts` | pass |
+| Exactly the configured free grant on account creation | `credits.test.ts` | pass |
 | Successful analysis deducts one credit | `credits.test.ts` | pass |
 | Failed analysis restores a credit | `credits.test.ts` | pass |
 | Retry protection (idempotency) | `credits.test.ts` | pass |
@@ -59,8 +59,6 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 | Cross-user access rejection | `access.test.ts` | pass |
 | Unsafe SQL rejection, incl. functions inside SELECT | `sqlGuard.test.ts` | pass |
 | Valid analytical queries accepted | `sqlGuard.test.ts` | pass |
-| Webhook signature verification | `webhook.test.ts` | pass |
-| Duplicate-payment protection | `webhook.test.ts` | pass |
 
 ### Notable assertions
 
@@ -100,15 +98,15 @@ successes and a final balance of 0, with the ledger reconciling.
 > independently by `CHECK (balance >= 0)`. Run the suite with `DATABASE_URL`
 > pointed at a real server to cover true contention.
 
-**Webhook** — signatures are generated with Stripe's own
-`generateTestHeaderString`, so verification is exercised for real. Rejected:
-missing header, forged signature, wrong secret, and a body tampered with after
-signing. A duplicate event grants nothing; a *new* event id for an
-already-paid session also grants nothing.
+**The operator's key failing** — `platformFailure.test.ts` mocks the registry
+into platform mode and makes the provider raise an auth error. Asserts 503 with
+`platform_unavailable`, that the reserved credit comes back, that the reply does
+not name the operator's provider, and that a *timeout* still reports as an
+ordinary retryable 502 rather than sending the user to the key form.
 
 ---
 
-## Frontend — 60 tests
+## Frontend — 72 tests
 
 | Area | Tests | Covers |
 |---|---|---|
@@ -116,7 +114,6 @@ already-paid session also grants nothing.
 | Exhausted credits | 6 | composer replaced, BYOK + free-demo exemptions, opt-in still gates, 402 opens modal, three actions offered |
 | BYOK | 3 | disclosures present, provider error shown with no silent fallback, key field is a password |
 | CSV upload | 4 | non-CSV rejected client-side, server error + hint shown, schema/warnings render, limits stated |
-| Checkout | 2 | test mode labelled, package id only sent, disabled when unconfigured |
 | Microphone fallback | 3 | unsupported-browser note, control appears when supported, Enter/Shift+Enter |
 | Accessibility | 3 | live region on progress, table caption, `aria-current` on selection |
 | Allowance copy | 5 | "N free questions" appears only when credits are actually metered |
@@ -217,8 +214,6 @@ provider call was made, so no AI credit was spent and none was recorded.
 - **The live Anthropic API.** No key was available in this environment, so the
   provider adapter's real request path is unexercised. It follows the current
   documented SDK surface, but treat the first real call as the integration test.
-- **Live Stripe delivery.** Webhook logic is tested against genuinely signed
-  payloads; the network round trip from Stripe is not.
 - **Browser end-to-end.** Frontend tests use jsdom with a mocked API. Playwright
   against the real stack is the next addition.
 - **Load and soak testing.** Throughput and memory under concurrent DuckDB

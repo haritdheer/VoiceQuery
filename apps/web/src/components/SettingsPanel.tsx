@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { AppConfigResponse, LedgerEntry, PurchaseRecord, SessionState } from '@voicequery/shared';
+import type { AppConfigResponse, LedgerEntry, SessionState } from '@voicequery/shared';
 import { Alert, Badge, Button, Card, Modal } from './ui.tsx';
 import { api } from '../lib/api.ts';
-import { formatMoney, formatRelativeTime } from '../lib/format.ts';
+import { formatRelativeTime } from '../lib/format.ts';
 
 const LEDGER_LABELS: Record<LedgerEntry['reason'], string> = {
   free_grant: 'Welcome grant',
   analysis_reserve: 'Analysis',
   analysis_refund: 'Refund',
-  purchase: 'Credit purchase',
   admin_adjust: 'Adjustment',
 };
 
@@ -18,7 +17,6 @@ export function SettingsPanel({
   session,
   config,
   onChanged,
-  onBuyCredits,
   onConnectKey,
 }: {
   open: boolean;
@@ -26,11 +24,9 @@ export function SettingsPanel({
   session: SessionState;
   config: AppConfigResponse;
   onChanged: () => void;
-  onBuyCredits: () => void;
   onConnectKey: () => void;
 }) {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [byok, setByok] = useState<{
     connected: boolean;
     providerId: string | null;
@@ -55,11 +51,8 @@ export function SettingsPanel({
           fingerprint: status.fingerprint,
         });
       }
-      if (config.billing.enabled) {
-        setPurchases(await api.purchases().catch(() => []));
-      }
     })();
-  }, [open, config.billing.enabled]);
+  }, [open]);
 
   async function disconnect() {
     setBusy(true);
@@ -137,58 +130,6 @@ export function SettingsPanel({
                   Connect an API key
                 </Button>
               </>
-            )}
-          </Card>
-        </section>
-
-        {/* ------------------------------ billing ----------------------------- */}
-        <section>
-          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
-            Billing
-            {config.billing.enabled && config.billing.testMode && (
-              <Badge tone="warning">Test mode</Badge>
-            )}
-          </h3>
-          <Card className="space-y-2 p-3">
-            {config.billing.enabled ? (
-              <>
-                <Button size="sm" variant="secondary" onClick={onBuyCredits}>
-                  Buy credits
-                </Button>
-                {purchases.length > 0 ? (
-                  <ul className="space-y-1">
-                    {purchases.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center justify-between gap-2 text-xs text-[var(--text-secondary)]"
-                      >
-                        <span>
-                          {p.credits} credits · {formatMoney(p.amountMinor, p.currency)}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <Badge tone={p.status === 'paid' ? 'good' : p.status === 'pending' ? 'neutral' : 'critical'}>
-                            {p.status}
-                          </Badge>
-                          <span className="text-[var(--text-muted)]">
-                            {formatRelativeTime(p.createdAt)}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-[var(--text-muted)]">No purchases yet.</p>
-                )}
-                <p className="text-xs text-[var(--text-muted)]">
-                  Credits are granted only after the payment provider confirms the payment via a
-                  signed webhook. For a refund, contact support — refunded credits are removed
-                  from the balance.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-[var(--text-secondary)]">
-                Credit purchases are not configured on this deployment.
-              </p>
             )}
           </Card>
         </section>

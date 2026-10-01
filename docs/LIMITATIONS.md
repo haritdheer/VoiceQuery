@@ -32,13 +32,6 @@ walk through them offline.
 |---|---|---|
 | Real AI answers | a provider key | Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `OPENROUTER_API_KEY`; demo mode turns itself off |
 | BYOK end-to-end | A real provider key to validate against | Any valid Anthropic, OpenAI or OpenRouter key |
-| Live checkout | `STRIPE_SECRET_KEY` + `CREDIT_PACKAGES` | See "Payments setup" in the README |
-| Webhook delivery | `STRIPE_WEBHOOK_SECRET` | `stripe listen --forward-to localhost:8787/api/billing/webhook` |
-
-The webhook *logic* is fully tested against genuinely signed payloads using
-Stripe's own `generateTestHeaderString`, so signature verification and duplicate
-protection are verified without a live account. What is untested is the network
-round trip from Stripe's servers.
 
 **No provider's success path has been exercised against a live API**, because no
 key was available in this environment. Each adapter follows its SDK's current
@@ -139,20 +132,6 @@ nothing in the UI claims there is.
 **Spoken replies use browser synthesis.** Quality varies by platform and it is
 off by default.
 
-## Payments
-
-**Refunds and chargebacks are manual.** Refund in the Stripe dashboard, then post
-a compensating `admin_adjust` ledger entry. Automatic reversal on
-`charge.refunded` / `charge.dispute.created` is not implemented, because whether
-to claw back already-spent credits is a policy decision rather than a technical
-one.
-
-**No subscriptions.** One-time credit packages only, by design.
-
-**Prices are unset.** `CREDIT_PACKAGES` ships empty. No monetary figure is
-invented anywhere in the source; pricing should come from measured model,
-speech, hosting, database and payment costs.
-
 ## Testing
 
 **Concurrency tests assert the invariant, not lock contention.** PGlite
@@ -174,7 +153,7 @@ instance sizing are unmeasured.
 ## Security posture
 
 Reviewed and handled: SQL injection into the analytics engine, cross-user data
-access, CSRF, session fixation, credit race conditions, webhook forgery and
+access, CSRF, session fixation, credit race conditions and
 replay, secret leakage into logs and responses, path traversal via dataset ids,
 prompt injection from uploaded data.
 

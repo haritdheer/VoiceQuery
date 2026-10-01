@@ -4,6 +4,10 @@ process.env.LOG_LEVEL = 'silent';
 // each needs a private data directory — otherwise two workers race to create
 // and open the same DuckDB file.
 process.env.DATA_DIR = `.test-data/worker-${process.pid}`;
+// Pinned so the ledger tests exercise the semantics — reserve, commit,
+// refund, the floor at zero — rather than tracking whatever the product's
+// grant happens to be. Changing FREE_CREDITS should not churn these.
+process.env.FREE_CREDITS = '2';
 
 import { rmSync } from 'node:fs';
 import { buildApp } from '../src/app.ts';

@@ -66,9 +66,8 @@ Postgres, the container, and a volume all in one project. Roughly ten minutes.
    ```
 
 7. **Generate a domain**: *Settings → Networking → Generate Domain*. Then set
-   `PUBLIC_URL` to it (no trailing slash) — one variable that gives correct
-   defaults for the CORS allowlist and the Stripe redirect URLs, all of which
-   otherwise still point at localhost.
+   `PUBLIC_URL` to it (no trailing slash) — it sets the CORS allowlist, which
+   otherwise still points at localhost.
 
    For a domain you own, use *Custom Domain* instead, add the CNAME Railway
    shows you at your registrar, and point `PUBLIC_URL` at that.
@@ -163,37 +162,31 @@ OPENROUTER_API_KEY=sk-or-v1-...# plus AI_MODEL, e.g. anthropic/claude-sonnet-4.5
 Set `AI_PROVIDER` as well if more than one key is present — the server refuses
 to guess and will fail to boot rather than silently pick one.
 
-Note that the platform key funds the **free credits** you give visitors. Each
-question is two model calls, so watch the spend. Two ways to control it:
-
-- Point `AI_MODEL` at a cheaper model.
-- Leave the platform key unset entirely and let users bring their own key.
-  Guests always get the demo provider regardless, so anonymous traffic can
-  never reach a paid endpoint.
-
 ---
 
-## Payments
+## What your key actually pays for
 
-Optional; billing stays disabled until both are set.
+This key funds the **free questions** every new account gets (`FREE_CREDITS`,
+default 5). After those, the user must connect their own key — there is
+nothing to buy, so your spend per account is bounded by that grant.
 
-```
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-CREDIT_PACKAGES=[{"id":"pack20","name":"20 questions","credits":20,"amountMinor":900,"currency":"usd"}]
-```
+Bounded *per account*, not in total. There is no email verification, so one
+person can register several times. Three ways to control it, in order of how
+much they actually protect you:
 
-The redirect URLs derive from `PUBLIC_URL`, so there is nothing extra to set
-provided that is correct.
+1. **Set a spend limit on the key at your provider.** The only ceiling that
+   cannot be bypassed by anything in this app. Do this one.
+2. **Lower `FREE_CREDITS`.** Remember each question is two model calls, so a
+   grant of 5 is up to 10 calls.
+3. **Point `AI_MODEL` at a cheaper model.**
 
-In the Stripe dashboard add an endpoint at
-`https://yourdomain.com/api/billing/webhook` subscribed to
-`checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-`checkout.session.async_payment_failed` and `checkout.session.expired`, then
-copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+Leaving the platform key unset entirely is also legitimate: the app then runs
+BYOK-or-demo and costs you nothing. Guests always get the demo provider either
+way, so anonymous traffic can never reach a paid endpoint.
 
-Keep `sk_test_` keys until you genuinely intend to take money — the UI labels
-test mode, and going live needs the merchant account owner's authorisation.
+If the key is rejected or runs out of quota, the app does not fall back to
+demo answers and pretend. The request returns `503 platform_unavailable`, the
+user's credit is refunded, and the UI opens the connect-your-own-key form.
 
 ---
 
@@ -207,8 +200,9 @@ test mode, and going live needs the merchant account owner's authorisation.
       if it says `pglite`, `DATABASE_URL` did not reach the container
 - [ ] Sign up, ask a question, upload a CSV, reload the page — the session
       should survive
-- [ ] `PUBLIC_URL` matches the domain people actually visit — otherwise a
-      Stripe checkout would return them to localhost
+- [ ] `PUBLIC_URL` matches the domain people actually visit
+- [ ] A spend limit is set on your provider key — the free grant bounds cost
+      per account, but nothing bounds how many accounts a visitor makes
 - [ ] Decide whether `GUEST_MODE_ENABLED` should stay on for a public link
 
 ---

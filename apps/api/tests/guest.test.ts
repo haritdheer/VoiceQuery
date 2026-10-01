@@ -144,13 +144,6 @@ describe('guest restrictions', () => {
     expect(res.body.code).toBe('account_required');
   });
 
-  it('refuses to start a checkout', async () => {
-    const { client } = await startGuest();
-    const res = await client.request('POST', '/api/billing/checkout', { packageId: 'pack20' });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('account_required');
-  });
-
   it('cannot read another user’s dataset', async () => {
     const owner = new TestClient(ctx.app);
     await owner.register(uniqueEmail());

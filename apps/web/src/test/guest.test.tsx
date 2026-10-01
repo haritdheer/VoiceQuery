@@ -24,8 +24,6 @@ vi.mock('../lib/api.ts', () => ({
     byokStatus: vi.fn(),
     connectByok: vi.fn(),
     disconnectByok: vi.fn(),
-    purchases: vi.fn(),
-    createCheckout: vi.fn(),
   },
   ApiRequestError: class ApiRequestError extends Error {
     constructor(
@@ -50,7 +48,6 @@ const noop = () => {};
 
 const CONFIG: AppConfigResponse = {
   demoMode: true,
-  billing: { enabled: false, testMode: true, packages: [] },
   providers: [
     {
       id: 'anthropic',

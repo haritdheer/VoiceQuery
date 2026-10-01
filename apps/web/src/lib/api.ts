@@ -7,7 +7,6 @@ import type {
   DatasetSummary,
   LedgerEntry,
   ProviderInfo,
-  PurchaseRecord,
   SessionState,
 } from '@voicequery/shared';
 
@@ -205,16 +204,5 @@ export const api = {
 
   async disconnectByok() {
     return request<{ connected: boolean }>('DELETE', '/api/byok');
-  },
-
-  /* -------------------------------- billing -------------------------------- */
-
-  async purchases(): Promise<PurchaseRecord[]> {
-    const res = await request<{ purchases: PurchaseRecord[] }>('GET', '/api/billing/purchases');
-    return res.purchases;
-  },
-
-  async createCheckout(packageId: string): Promise<{ url: string; testMode: boolean }> {
-    return request('POST', '/api/billing/checkout', { packageId });
   },
 };

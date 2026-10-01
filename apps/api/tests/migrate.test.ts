@@ -74,8 +74,6 @@ describe('migrations on a fresh database', () => {
       'conversations',
       'messages',
       'idempotency_records',
-      'purchases',
-      'payment_events',
     ]) {
       const rows = await db.query<{ n: string | number }>(
         `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = $1`,

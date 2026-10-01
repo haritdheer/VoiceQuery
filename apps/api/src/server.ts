@@ -15,7 +15,6 @@ try {
       port: cfg.PORT,
       driver: db.driver,
       demoMode: cfg.demoMode,
-      billing: cfg.billingEnabled ? (cfg.billingTestMode ? 'test mode' : 'LIVE') : 'disabled',
     },
     'VoiceQuery API listening',
   );

@@ -28,10 +28,8 @@ const EnvSchema = z.object({
    * The public origin this deployment is reachable at, e.g.
    * https://voicequery.up.railway.app — no trailing slash.
    *
-   * Setting this one variable gives correct defaults for the CORS allowlist
-   * and the checkout redirect URLs, which otherwise point at localhost. That
-   * matters most for payments: a forgotten checkout URL sends a paying user
-   * to localhost after Stripe takes their money.
+   * Sets the default CORS allowlist, which otherwise still points at a
+   * developer's laptop after going live.
    */
   PUBLIC_URL: z.string().optional(),
 
@@ -94,7 +92,15 @@ const EnvSchema = z.object({
   DUCKDB_THREADS: int(2),
 
   /* --------------------------------- credits -------------------------------- */
-  FREE_CREDITS: int(2),
+
+  /**
+   * Questions a new account can ask on the operator's own provider key.
+   *
+   * There is no way to buy more: when these run out the only way forward is
+   * to connect your own key. Note that one question is two model calls — a
+   * SQL plan and an explanation — so this is 2x that many calls per account.
+   */
+  FREE_CREDITS: int(5),
 
   /**
    * Whether the offline demo provider consumes credits.
@@ -125,31 +131,10 @@ const EnvSchema = z.object({
   /** Guest accounts and their conversations are swept after this long. */
   GUEST_TTL_HOURS: int(24),
 
-  /* --------------------------------- billing -------------------------------- */
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  /**
-   * JSON array of credit packages. Price is deliberately operator-configured:
-   * it should be derived from measured model/hosting cost, not guessed here.
-   * e.g. [{"id":"pack20","name":"20 questions","credits":20,"amountMinor":900,"currency":"usd"}]
-   */
-  CREDIT_PACKAGES: z.string().default('[]'),
-  /** Both default to PUBLIC_URL when it is set. */
-  CHECKOUT_SUCCESS_URL: z.string().optional(),
-  CHECKOUT_CANCEL_URL: z.string().optional(),
-
   /* ------------------------------- rate limits ------------------------------ */
   RATE_LIMIT_ANALYSIS_PER_HOUR: int(60),
   RATE_LIMIT_UPLOAD_PER_HOUR: int(20),
   RATE_LIMIT_GLOBAL_PER_MINUTE: int(300),
-});
-
-const PackageSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  credits: z.number().int().positive(),
-  amountMinor: z.number().int().positive(),
-  currency: z.string().length(3),
 });
 
 function load() {
@@ -160,29 +145,13 @@ function load() {
   }
   const e = parsed.data;
 
-  let packages: z.infer<typeof PackageSchema>[] = [];
-  try {
-    const raw: unknown = JSON.parse(e.CREDIT_PACKAGES);
-    packages = z.array(PackageSchema).parse(raw);
-  } catch (err) {
-    throw new Error(
-      `CREDIT_PACKAGES must be a JSON array of {id,name,credits,amountMinor,currency}: ${
-        (err as Error).message
-      }`,
-    );
-  }
-
   // Accept the common aliases so the app works on platforms that name the
   // variable differently. Does not help where the value simply is not set.
   const databaseUrl = e.DATABASE_URL || e.POSTGRES_URL || e.POSTGRESQL_URL || undefined;
 
-  // One public origin drives the three settings that would otherwise still
-  // point at a developer's laptop after going live.
-  // Trailing slashes would produce "https://host//app?checkout=success".
+  // Trailing slashes would produce "https://host//path" downstream.
   const publicUrl = e.PUBLIC_URL ? e.PUBLIC_URL.replace(/\/+$/, '') : undefined;
   const origin = publicUrl ?? 'http://localhost:5173';
-  const checkoutSuccessUrl = e.CHECKOUT_SUCCESS_URL ?? `${origin}/app?checkout=success`;
-  const checkoutCancelUrl = e.CHECKOUT_CANCEL_URL ?? `${origin}/app?checkout=cancelled`;
   const corsOrigins = (e.CORS_ORIGINS ?? origin)
     .split(',')
     .map((v) => v.trim())
@@ -276,14 +245,6 @@ function load() {
   /** No platform AI key => the app answers with the clearly-labelled demo provider. */
   const demoMode = !platformProvider;
 
-  /** Stripe test keys are prefixed sk_test_; anything else is live. */
-  const billingEnabled = Boolean(e.STRIPE_SECRET_KEY) && packages.length > 0;
-  const billingTestMode = !e.STRIPE_SECRET_KEY?.startsWith('sk_live_');
-
-  if (isProd && billingEnabled && !e.STRIPE_WEBHOOK_SECRET) {
-    throw new Error('STRIPE_WEBHOOK_SECRET is required when billing is enabled in production.');
-  }
-
   return Object.freeze({
     ...e,
     DATABASE_URL: databaseUrl,
@@ -291,13 +252,8 @@ function load() {
     isTest: e.NODE_ENV === 'test',
     corsOrigins,
     publicUrl,
-    CHECKOUT_SUCCESS_URL: checkoutSuccessUrl,
-    CHECKOUT_CANCEL_URL: checkoutCancelUrl,
-    packages,
     demoMode,
     platformProvider,
-    billingEnabled,
-    billingTestMode,
   });
 }
 

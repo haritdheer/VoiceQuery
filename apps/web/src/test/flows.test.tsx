@@ -34,8 +34,6 @@ vi.mock('../lib/api.ts', () => ({
     byokStatus: vi.fn(),
     connectByok: vi.fn(),
     disconnectByok: vi.fn(),
-    purchases: vi.fn(),
-    createCheckout: vi.fn(),
   },
   ApiRequestError: class ApiRequestError extends Error {
     constructor(
@@ -53,7 +51,7 @@ vi.mock('../lib/api.ts', () => ({
 
 const { api, ApiRequestError } = await import('../lib/api.ts');
 const { Dashboard } = await import('../pages/Dashboard.tsx');
-const { UpgradeModal } = await import('../components/UpgradeModal.tsx');
+const { ConnectKeyModal } = await import('../components/ConnectKeyModal.tsx');
 const { Composer } = await import('../components/Composer.tsx');
 const { Landing } = await import('../pages/Landing.tsx');
 const { AuthDialog } = await import('../components/AuthDialog.tsx');
@@ -63,13 +61,6 @@ const { AppFooter } = await import('../components/AppFooter.tsx');
 
 const CONFIG: AppConfigResponse = {
   demoMode: false,
-  billing: {
-    enabled: true,
-    testMode: true,
-    packages: [
-      { id: 'pack20', name: '20 questions', credits: 20, amountMinor: 900, currency: 'usd' },
-    ],
-  },
   providers: [
     {
       id: 'anthropic',
@@ -112,7 +103,7 @@ const CONFIG: AppConfigResponse = {
     maxResultRows: 500,
     datasetTtlHours: 24,
   },
-  freeCredits: 2,
+  freeCredits: 5,
   creditsEnabled: true,
   guest: { enabled: true, nudgeAfter: 2, nudgeEvery: 3, questionsLimit: 15 },
 };
@@ -231,7 +222,6 @@ beforeEach(() => {
     expiresAt: null,
     providers: CONFIG.providers,
   });
-  vi.mocked(api.purchases).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -367,7 +357,7 @@ describe('sample dataset analysis', () => {
 describe('exhausted credits', () => {
   it('replaces the composer with an upgrade prompt at zero credits', async () => {
     renderDashboard(SESSION(0));
-    expect(await screen.findByText(/You've used your 2 free questions/)).toBeInTheDocument();
+    expect(await screen.findByText(/You've used your 5 free questions/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Ask a question about your data')).not.toBeInTheDocument();
   });
 
@@ -380,7 +370,7 @@ describe('exhausted credits', () => {
   it('does not charge credits in free demo mode', async () => {
     renderDashboard(SESSION(0, 'demo', false));
     await screen.findByText('Demo answers');
-    expect(screen.queryByText(/You've used your 2 free questions/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/You've used your 5 free questions/)).not.toBeInTheDocument();
   });
 
   it('offers a way out of demo answers instead of only labelling them', async () => {
@@ -397,7 +387,7 @@ describe('exhausted credits', () => {
 
   it('still gates demo mode when the operator opts into charging', async () => {
     renderDashboard(SESSION(0, 'demo', true));
-    expect(await screen.findByText(/You've used your 2 free questions/)).toBeInTheDocument();
+    expect(await screen.findByText(/You've used your 5 free questions/)).toBeInTheDocument();
   });
 
   /* ------------------------ signed-in demo-mode gate ----------------------- */
@@ -487,41 +477,75 @@ describe('exhausted credits', () => {
     await waitFor(() => expect(onOutOfCredits).toHaveBeenCalled());
   });
 
-  it('offers all three upgrade actions', async () => {
+  it('sends an out-of-credits user straight to the key form, with nothing to buy', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
+        reason="exhausted"
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
-    expect(screen.getByText("You've used your 2 free questions")).toBeInTheDocument();
-    expect(screen.getByText('Use my API key')).toBeInTheDocument();
-    expect(screen.getByText('Buy credits')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Maybe later' })).toBeInTheDocument();
+    expect(screen.getByText("You've used your 5 free questions")).toBeInTheDocument();
+    // The form itself, not a menu: there is no second option to offer.
+    expect(screen.getByLabelText(/API key/)).toBeInTheDocument();
+    expect(screen.queryByText(/Buy credits/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/purchase/i)).not.toBeInTheDocument();
+  });
+
+  it('says the shared key failed, and that nothing was charged', () => {
+    render(
+      <ConnectKeyModal
+        open
+        reason="platform_unavailable"
+        onClose={noop}
+        onConnected={noop}
+        providers={CONFIG.providers}
+        freeCredits={5}
+      />,
+    );
+    expect(screen.getByText('Our shared key is unavailable')).toBeInTheDocument();
+    expect(screen.getByText(/you were not charged for it/)).toBeInTheDocument();
+  });
+
+  it('opens the key form when the platform key is rejected mid-question', async () => {
+    const user = userEvent.setup();
+    const onConnectKey = vi.fn();
+    vi.mocked(api.analyze).mockRejectedValue(
+      new ApiRequestError(
+        'The shared API key is not usable right now.',
+        503,
+        'platform_unavailable',
+      ),
+    );
+
+    renderDashboard(SESSION(3), { onConnectKey });
+    await user.click(
+      await screen.findByRole('button', { name: 'Which products generated the most revenue?' }),
+    );
+
+    // Not an error message the user can do nothing about — the one action
+    // that unblocks them, with the reason so the copy can explain itself.
+    await waitFor(() => expect(onConnectKey).toHaveBeenCalledWith('platform_unavailable'));
+    expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
   });
 });
 
 /* ----------------------------------- BYOK ---------------------------------- */
 
 describe('bring your own key', () => {
-  it('states that the user’s provider pays and that a chat subscription does not', async () => {
-    const user = userEvent.setup();
+  it('states that the user’s provider pays and that a chat subscription does not', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
-
-    await user.click(screen.getByText('Use my API key'));
 
     expect(screen.getByText(/Your provider account pays/)).toBeInTheDocument();
     expect(screen.getByText(/does not include API credits/)).toBeInTheDocument();
@@ -534,92 +558,39 @@ describe('bring your own key', () => {
     vi.mocked(api.connectByok).mockRejectedValue(
       new ApiRequestError('The API key was rejected by Anthropic.', 400, 'byok_failed'),
     );
-    const onByokConnected = vi.fn();
+    const onConnected = vi.fn();
 
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
         onClose={noop}
-        onByokConnected={onByokConnected}
-        billing={CONFIG.billing}
+        onConnected={onConnected}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
 
-    await user.click(screen.getByText('Use my API key'));
     await user.type(screen.getByLabelText(/API key/), 'sk-ant-invalid');
     await user.click(screen.getByRole('button', { name: /Validate & connect/ }));
 
     expect(await screen.findByText('The API key was rejected by Anthropic.')).toBeInTheDocument();
     // The modal stays open and nothing was connected.
-    expect(onByokConnected).not.toHaveBeenCalled();
+    expect(onConnected).not.toHaveBeenCalled();
   });
 
-  it('uses a password field so the key is not shown or autofilled', async () => {
-    const user = userEvent.setup();
+  it('uses a password field so the key is not shown or autofilled', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
-    await user.click(screen.getByText('Use my API key'));
     const input = screen.getByLabelText(/API key/);
     expect(input).toHaveAttribute('type', 'password');
     expect(input).toHaveAttribute('autocomplete', 'off');
-  });
-});
-
-/* --------------------------------- checkout -------------------------------- */
-
-describe('checkout', () => {
-  it('labels test mode and creates a session from a package id only', async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.createCheckout).mockResolvedValue({
-      url: 'https://checkout.stripe.com/test',
-      testMode: true,
-    });
-
-    render(
-      <UpgradeModal
-        open
-        onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
-        providers={CONFIG.providers}
-        freeCredits={2}
-      />,
-    );
-
-    await user.click(screen.getByText('Buy credits'));
-    expect(await screen.findByText('Test mode')).toBeInTheDocument();
-    expect(screen.getByText('$9.00')).toBeInTheDocument();
-
-    // The package name appears in both the title and subtitle, so select the
-    // row by its price, which is unique.
-    await user.click(screen.getByText('$9.00').closest('button')!);
-    await waitFor(() => expect(api.createCheckout).toHaveBeenCalledWith('pack20'));
-    // The client sends an id, never a price.
-    expect(vi.mocked(api.createCheckout).mock.calls[0]).toEqual(['pack20']);
-  });
-
-  it('disables buying when billing is not configured', () => {
-    render(
-      <UpgradeModal
-        open
-        onClose={noop}
-        onByokConnected={noop}
-        billing={{ enabled: false, testMode: true, packages: [] }}
-        providers={CONFIG.providers}
-        freeCredits={2}
-      />,
-    );
-    expect(screen.getByText('Buy credits').closest('button')).toBeDisabled();
   });
 });
 
@@ -846,7 +817,7 @@ describe('free-allowance copy', () => {
 
   it('promises free questions when credits are actually metered', () => {
     render(<Landing config={METERED} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
-    expect(screen.getByText(/2 free questions when you sign up/)).toBeInTheDocument();
+    expect(screen.getByText(/5 free questions when you sign up/)).toBeInTheDocument();
   });
 
   it('does not promise a free allowance when nothing is metered', () => {
@@ -868,7 +839,7 @@ describe('free-allowance copy', () => {
         open
         onClose={noop}
         onAuthenticated={noop}
-        freeCredits={2}
+        freeCredits={5}
         creditsEnabled={false}
       />,
     );
@@ -878,11 +849,11 @@ describe('free-allowance copy', () => {
 
   it('shows the allowance in the sign-up dialog when it is real', () => {
     render(
-      <AuthDialog open onClose={noop} onAuthenticated={noop} freeCredits={2} creditsEnabled />,
+      <AuthDialog open onClose={noop} onAuthenticated={noop} freeCredits={5} creditsEnabled />,
     );
-    expect(screen.getByText(/New accounts get 2 free questions/)).toBeInTheDocument();
+    expect(screen.getByText(/New accounts get 5 free questions/)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Create account & get 2 free questions/ }),
+      screen.getByRole('button', { name: /Create account & get 5 free questions/ }),
     ).toBeInTheDocument();
   });
 });
@@ -897,15 +868,13 @@ describe('free-allowance copy', () => {
 describe('connecting an API key is reachable', () => {
   it('opens straight to the key form when asked', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
-        initialView="byok"
         reason="upgrade"
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
     // The key field is present without any intermediate click.
@@ -914,34 +883,31 @@ describe('connecting an API key is reachable', () => {
 
   it('does not claim the allowance is exhausted when it is not', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
-        initialView="byok"
         reason="upgrade"
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
     expect(screen.getByText('Use your own AI provider key')).toBeInTheDocument();
-    expect(screen.queryByText(/You've used your 2 free questions/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/You've used your 5 free questions/)).not.toBeInTheDocument();
   });
 
   it('still says so when the allowance really is exhausted', () => {
     render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
         reason="exhausted"
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
-    expect(screen.getByText("You've used your 2 free questions")).toBeInTheDocument();
+    expect(screen.getByText("You've used your 5 free questions")).toBeInTheDocument();
   });
 });
 
@@ -950,15 +916,13 @@ describe('connecting an API key is reachable', () => {
 describe('provider selection', () => {
   function openByok() {
     return render(
-      <UpgradeModal
+      <ConnectKeyModal
         open
-        initialView="byok"
         reason="upgrade"
         onClose={noop}
-        onByokConnected={noop}
-        billing={CONFIG.billing}
+        onConnected={noop}
         providers={CONFIG.providers}
-        freeCredits={2}
+        freeCredits={5}
       />,
     );
   }

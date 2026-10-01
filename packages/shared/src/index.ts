@@ -180,7 +180,6 @@ export type LedgerReason =
   | 'free_grant'
   | 'analysis_reserve'
   | 'analysis_refund'
-  | 'purchase'
   | 'admin_adjust';
 
 export interface LedgerEntry {
@@ -189,35 +188,6 @@ export interface LedgerEntry {
   reason: LedgerReason;
   balanceAfter: number;
   note: string | null;
-  createdAt: string;
-}
-
-/* --------------------------------- billing -------------------------------- */
-
-export interface CreditPackage {
-  id: string;
-  name: string;
-  credits: number;
-  /** Minor units (e.g. cents). Configured by the operator, never hardcoded. */
-  amountMinor: number;
-  currency: string;
-}
-
-export interface BillingConfig {
-  enabled: boolean;
-  /** True when Stripe is in test mode — the UI must say so. */
-  testMode: boolean;
-  packages: CreditPackage[];
-}
-
-export interface PurchaseRecord {
-  id: string;
-  packageId: string;
-  credits: number;
-  amountMinor: number;
-  currency: string;
-  status: 'pending' | 'paid' | 'failed' | 'cancelled';
-  providerRef: string | null;
   createdAt: string;
 }
 
@@ -244,7 +214,6 @@ export interface ProviderInfo {
 export interface AppConfigResponse {
   /** True when the server has no platform AI credentials and is returning simulated answers. */
   demoMode: boolean;
-  billing: BillingConfig;
   providers: ProviderInfo[];
   limits: {
     maxUploadBytes: number;
@@ -275,10 +244,13 @@ export interface AppConfigResponse {
 export interface ApiError {
   error: string;
   message: string;
-  /** Present on 402 so the client can open the upgrade modal. */
+  /** Set when the client should do something specific rather than just report. */
   code?:
     | 'insufficient_credits'
+    /** The user's own key failed. The message names their provider. */
     | 'byok_failed'
+    /** The operator's shared key is rejected, expired or out of quota. */
+    | 'platform_unavailable'
     | 'rate_limited'
     | 'unsafe_sql'
     | 'validation'

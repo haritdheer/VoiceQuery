@@ -21,7 +21,6 @@ import { datasetRoutes } from './routes/datasets.ts';
 import { analysisRoutes } from './routes/analysis.ts';
 import { creditRoutes } from './routes/credits.ts';
 import { byokRoutes } from './routes/byok.ts';
-import { billingConfig, billingRoutes } from './routes/billing.ts';
 import { logger, safeErrorMessage } from './lib/logger.ts';
 import { sendError } from './lib/http.ts';
 
@@ -46,14 +45,14 @@ export async function buildApp(options: BuildOptions) {
   }
 
   /**
-   * Preserve the raw JSON body. Stripe signature verification must hash the
-   * exact bytes that were sent, so a re-serialised object will not verify.
+   * Treat an empty JSON body as `{}`. Fastify's default parser rejects it,
+   * which would turn a bodyless POST — sign out, disconnect a key — into a
+   * 400 purely because the browser sent a Content-Type header.
    */
   app.addContentTypeParser(
     'application/json',
     { parseAs: 'buffer' },
-    (req, body: Buffer, done) => {
-      (req as FastifyRequest & { rawBody?: Buffer }).rawBody = body;
+    (_req, body: Buffer, done) => {
       if (body.length === 0) return done(null, {});
       try {
         done(null, JSON.parse(body.toString('utf8')));
@@ -104,7 +103,6 @@ export async function buildApp(options: BuildOptions) {
   app.get('/api/config', async (): Promise<AppConfigResponse> => {
     return {
       demoMode: cfg.demoMode,
-      billing: billingConfig(),
       providers: SUPPORTED_PROVIDERS,
       limits: {
         maxUploadBytes: cfg.MAX_UPLOAD_BYTES,
@@ -142,7 +140,6 @@ export async function buildApp(options: BuildOptions) {
 
   await app.register(creditRoutes);
   await app.register(byokRoutes);
-  await app.register(billingRoutes);
 
   /* ------------------------- single-origin frontend ----------------------- */
 

@@ -123,16 +123,23 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
                 ? 404
                 : err.code === 'unsafe_sql'
                   ? 422
-                  : 502;
+                  : // platform_unavailable is 503, not 502: the upstream did
+                    // answer, it refused us. It is also the operator's problem
+                    // to fix, so it should show up as such in any monitoring.
+                    err.code === 'platform_unavailable'
+                    ? 503
+                    : 502;
 
         const code =
           err.code === 'insufficient_credits'
             ? ('insufficient_credits' as const)
             : err.code === 'guest_limit'
               ? ('guest_limit' as const)
-              : err.code === 'unsafe_sql'
-                ? ('unsafe_sql' as const)
-                : undefined;
+              : err.code === 'platform_unavailable'
+                ? ('platform_unavailable' as const)
+                : err.code === 'unsafe_sql'
+                  ? ('unsafe_sql' as const)
+                  : undefined;
 
         return sendError(reply, status, err.code, err.message, code, {
           creditsRemaining: await getBalance(request.db, userId),

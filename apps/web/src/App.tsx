@@ -4,7 +4,7 @@ import { api } from './lib/api.ts';
 import { Landing } from './pages/Landing.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { AuthDialog } from './components/AuthDialog.tsx';
-import { UpgradeModal } from './components/UpgradeModal.tsx';
+import { ConnectKeyModal, type ConnectKeyReason } from './components/ConnectKeyModal.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { GuestNudgeModal } from './components/GuestNudgeModal.tsx';
 import { AppFooter } from './components/AppFooter.tsx';
@@ -24,13 +24,11 @@ export default function App() {
 
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
-  const [upgrade, setUpgrade] = useState<{
-    open: boolean;
-    view: 'choose' | 'byok' | 'buy';
-    reason: 'exhausted' | 'upgrade';
-  }>({ open: false, view: 'choose', reason: 'exhausted' });
+  const [connectKey, setConnectKey] = useState<{ open: boolean; reason: ConnectKeyReason }>({
+    open: false,
+    reason: 'upgrade',
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [checkoutNotice, setCheckoutNotice] = useState<string | null>(null);
   const [nudge, setNudge] = useState<{ open: boolean; blocking: boolean }>({
     open: false,
     blocking: false,
@@ -48,27 +46,6 @@ export default function App() {
         setBootError('Could not reach the VoiceQuery API. Is the server running?');
       }
     })();
-  }, []);
-
-  /**
-   * A checkout redirect is navigation only — it is never treated as proof of
-   * payment. Credits appear once the signed webhook has been verified, so we
-   * just re-read the authoritative balance from the server.
-   */
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const checkout = params.get('checkout');
-    if (!checkout) return;
-
-    if (checkout === 'success') {
-      setCheckoutNotice(
-        'Payment received. Credits are added once the payment provider confirms it — this is usually instant, so refresh if the balance has not updated yet.',
-      );
-      void refreshSession();
-    } else if (checkout === 'cancelled') {
-      setCheckoutNotice('Checkout was cancelled. No payment was taken.');
-    }
-    window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
   const refreshSession = useCallback(async () => {
@@ -171,34 +148,13 @@ export default function App() {
 
   return (
     <>
-      {checkoutNotice && (
-        <div className="fixed inset-x-0 top-0 z-50 p-3">
-          <div className="mx-auto max-w-2xl">
-            <Alert tone="accent">
-              <div className="flex items-start justify-between gap-3">
-                <p>{checkoutNotice}</p>
-                <button
-                  type="button"
-                  onClick={() => setCheckoutNotice(null)}
-                  className="shrink-0 text-xs underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </Alert>
-          </div>
-        </div>
-      )}
-
       {route === 'app' && signedIn ? (
         <Dashboard
           session={session}
           config={config}
           onOpenSettings={() => setSettingsOpen(true)}
-          onOutOfCredits={() =>
-            setUpgrade({ open: true, view: 'choose', reason: 'exhausted' })
-          }
-          onConnectKey={() => setUpgrade({ open: true, view: 'byok', reason: 'upgrade' })}
+          onOutOfCredits={() => setConnectKey({ open: true, reason: 'exhausted' })}
+          onConnectKey={(reason) => setConnectKey({ open: true, reason: reason ?? 'upgrade' })}
           onSessionRefresh={() => void refreshSession()}
           onSignOut={() => void signOut()}
           onGuestNudge={(blocking) => setNudge({ open: true, blocking })}
@@ -241,15 +197,13 @@ export default function App() {
         />
       )}
 
-      <UpgradeModal
-        open={upgrade.open}
-        initialView={upgrade.view}
-        reason={upgrade.reason}
-        onClose={() => setUpgrade((u) => ({ ...u, open: false }))}
-        billing={config.billing}
+      <ConnectKeyModal
+        open={connectKey.open}
+        reason={connectKey.reason}
+        onClose={() => setConnectKey((s) => ({ ...s, open: false }))}
         providers={config.providers}
         freeCredits={config.freeCredits}
-        onByokConnected={() => void refreshSession()}
+        onConnected={() => void refreshSession()}
       />
 
       <AppFooter />
@@ -261,13 +215,9 @@ export default function App() {
           session={session}
           config={config}
           onChanged={() => void refreshSession()}
-          onBuyCredits={() => {
-            setSettingsOpen(false);
-            setUpgrade({ open: true, view: 'buy', reason: 'upgrade' });
-          }}
           onConnectKey={() => {
             setSettingsOpen(false);
-            setUpgrade({ open: true, view: 'byok', reason: 'upgrade' });
+            setConnectKey({ open: true, reason: 'upgrade' });
           }}
         />
       )}

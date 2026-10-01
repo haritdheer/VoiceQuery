@@ -43,6 +43,7 @@ export class PipelineError extends Error {
       | 'dataset_not_found'
       | 'insufficient_credits'
       | 'guest_limit'
+      | 'platform_unavailable'
       | 'unsafe_sql'
       | 'provider'
       | 'query'
@@ -255,6 +256,26 @@ export async function runAnalysis(input: AnalyseInput): Promise<AnalysisResponse
     isGuest: input.isGuest,
   });
 
+  /**
+   * An auth-class failure covers a rejected key, an expired one, and an
+   * exhausted quota. On the *operator's* key that is not the user's fault and
+   * not something retrying fixes — their only way forward is their own key.
+   * It gets its own code so the client can open the key form instead of
+   * showing an error the user can do nothing about.
+   *
+   * On a BYOK key the same failure stays a plain provider error: there the
+   * message names the user's own provider and is directly actionable.
+   */
+  const asPipelineError = (err: ProviderError): PipelineError =>
+    err.kind === 'auth' && mode === 'platform'
+      ? new PipelineError(
+          'The shared API key is not usable right now, so this question could not be ' +
+            'answered. Connect your own API key to continue — you have not been charged.',
+          'platform_unavailable',
+          err.kind,
+        )
+      : new PipelineError(err.message, 'provider', err.kind);
+
   /* --- 3. reserve before spending ---------------------------------------- */
   let reservationId: string | null = null;
   if (consumesCredit) {
@@ -302,9 +323,7 @@ export async function runAnalysis(input: AnalyseInput): Promise<AnalysisResponse
       planUsage = generated.usage;
       simulated = generated.simulated;
     } catch (err) {
-      if (err instanceof ProviderError) {
-        throw new PipelineError(err.message, 'provider', err.kind);
-      }
+      if (err instanceof ProviderError) throw asPipelineError(err);
       throw err;
     }
     clock.finish('generating_sql');
@@ -384,9 +403,7 @@ export async function runAnalysis(input: AnalyseInput): Promise<AnalysisResponse
       answer = explained.value;
       explainUsage = explained.usage;
     } catch (err) {
-      if (err instanceof ProviderError) {
-        throw new PipelineError(err.message, 'provider', err.kind);
-      }
+      if (err instanceof ProviderError) throw asPipelineError(err);
       throw err;
     }
     clock.finish('preparing_answer');

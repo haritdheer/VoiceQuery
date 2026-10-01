@@ -229,31 +229,6 @@ export async function refundCredit(
   });
 }
 
-/** Grants purchased credits. Caller must have verified the payment first. */
-export async function grantCredits(
-  db: Db,
-  userId: string,
-  amount: number,
-  note: string,
-): Promise<number> {
-  return db.transaction(async (tx) => {
-    const account = await lockAccount(tx, userId);
-    const balanceAfter = account.balance + amount;
-    await tx.query(
-      `UPDATE credit_accounts SET balance = $2, updated_at = now() WHERE user_id = $1`,
-      [userId, balanceAfter],
-    );
-    await writeLedger(tx, {
-      userId,
-      delta: amount,
-      reason: 'purchase',
-      balanceAfter,
-      note: note.slice(0, 200),
-    });
-    return balanceAfter;
-  });
-}
-
 export async function listLedger(db: Db, userId: string, limit = 50): Promise<LedgerEntry[]> {
   const rows = await db.query<{
     id: string;

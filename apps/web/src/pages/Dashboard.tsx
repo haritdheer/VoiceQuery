@@ -13,6 +13,7 @@ import { DatasetPanel } from '../components/DatasetPanel.tsx';
 import { MessageCard, PendingCard } from '../components/MessageCard.tsx';
 import { api, ApiRequestError } from '../lib/api.ts';
 import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
+import type { ConnectKeyReason } from '../components/ConnectKeyModal.tsx';
 
 /**
  * The working surface: dataset selection on the left, conversation on the right.
@@ -41,8 +42,8 @@ export function Dashboard({
   /** Raised when a guest should be shown the sign-in nudge. */
   onGuestNudge?: (blocking: boolean) => void;
   onSignUp?: () => void;
-  /** Opens the provider-key form directly. */
-  onConnectKey?: () => void;
+  /** Opens the provider-key form directly, with the reason it is showing. */
+  onConnectKey?: (reason?: ConnectKeyReason) => void;
 }) {
   const [datasets, setDatasets] = useState<DatasetSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -190,9 +191,16 @@ export function Dashboard({
           } else if (err.code === 'insufficient_credits') {
             onOutOfCredits();
             onSessionRefresh();
+          } else if (err.code === 'platform_unavailable') {
+            // The operator's key is rejected or out of quota. Nothing the
+            // user can retry, and the credit was refunded — so go straight
+            // to the only thing that unblocks them rather than showing an
+            // error they can do nothing about.
+            onConnectKey?.('platform_unavailable');
+            onSessionRefresh();
           } else if (err.code === 'byok_failed') {
             setError(
-              `${err.message} Your key was not used to run this. Reconnect a working key, or disconnect it to use application credits.`,
+              `${err.message} Your key was not used to run this. Reconnect a working key, or disconnect it to use your free questions.`,
             );
           } else {
             setError(err.message);
@@ -214,6 +222,7 @@ export function Dashboard({
       config.guest,
       onGuestNudge,
       onOutOfCredits,
+      onConnectKey,
       onSessionRefresh,
     ],
   );
@@ -435,11 +444,11 @@ export function Dashboard({
             ) : outOfCredits ? (
               <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <p className="text-sm text-[var(--text-secondary)]">
-                  You've used your {config.freeCredits} free questions. Your results above stay
-                  available.
+                  You've used your {config.freeCredits} free questions. Connect your own API key
+                  to keep going — your results above stay available.
                 </p>
                 <Button size="sm" onClick={onOutOfCredits}>
-                  Continue
+                  Use my API key
                 </Button>
               </Card>
             ) : (
@@ -461,7 +470,7 @@ export function Dashboard({
           </div>
           </div>
 
-          {demoLocked && <RealAiGate onConnectKey={() => onConnectKey?.()} />}
+          {demoLocked && <RealAiGate onConnectKey={() => onConnectKey?.('demo')} />}
         </main>
       </div>
     </div>

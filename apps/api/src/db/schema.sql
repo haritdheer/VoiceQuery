@@ -157,26 +157,3 @@ CREATE TABLE IF NOT EXISTS idempotency_records (
   PRIMARY KEY (user_id, key)
 );
 
-CREATE TABLE IF NOT EXISTS purchases (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  package_id    TEXT NOT NULL,
-  credits       INTEGER NOT NULL,
-  amount_minor  INTEGER NOT NULL,
-  currency      TEXT NOT NULL,
-  status        TEXT NOT NULL CHECK (status IN ('pending', 'paid', 'failed', 'cancelled')),
-  provider      TEXT NOT NULL DEFAULT 'stripe',
-  provider_ref  TEXT UNIQUE,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS purchases_user_idx ON purchases(user_id, created_at DESC);
-
--- Webhook de-duplication. A provider may deliver the same event many times;
--- the primary key makes credit grants exactly-once.
-CREATE TABLE IF NOT EXISTS payment_events (
-  id           TEXT PRIMARY KEY,
-  provider     TEXT NOT NULL DEFAULT 'stripe',
-  type         TEXT NOT NULL,
-  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
