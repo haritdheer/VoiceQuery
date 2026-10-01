@@ -241,9 +241,14 @@ UI can say "showing 500 of 12,480" honestly.
 
 ## Guest mode
 
-**Try the demo** starts an anonymous session — no email, no password. A guest
+**Try the demo** starts an anonymous session — no credentials at all. A guest
 is a real `users` row with no credentials and an expiry, so every ownership
 check, conversation and message path works unchanged.
+
+Signing up is barely more friction: any non-empty username and password are
+accepted, with no email format required and no minimum length. Nothing is ever
+mailed anywhere. See [Security posture](docs/LIMITATIONS.md#security-posture)
+for what that trade costs.
 
 What a guest can do:
 

@@ -69,9 +69,30 @@ describe('authentication', () => {
     expect(second.status).toBe(409);
   });
 
-  it('rejects a weak password', async () => {
-    const res = await new TestClient(ctx.app).register(uniqueEmail(), 'short');
-    expect(res.status).toBe(400);
+  /**
+   * Credential rules are deliberately minimal on this demo — any username,
+   * any password — so the only thing left to enforce is that neither is
+   * blank. The hashing, session and CSRF guarantees are unchanged by that
+   * and are covered above.
+   */
+  it('accepts any non-empty credentials', async () => {
+    const res = await new TestClient(ctx.app).register(uniqueEmail(), 'x');
+    expect(res.status).toBe(200);
+  });
+
+  it('still rejects a blank username or password', async () => {
+    const client = new TestClient(ctx.app);
+    expect((await client.register('   ', 'whatever')).status).toBe(400);
+    expect((await client.register(uniqueEmail(), '')).status).toBe(400);
+  });
+
+  it('treats a username as case- and space-insensitive, so one person is one account', async () => {
+    const client = new TestClient(ctx.app);
+    const name = `Case Test ${Date.now()}`;
+    expect((await client.register(name, 'pw')).status).toBe(200);
+    // Same identity, differently typed — must collide rather than create a second.
+    const again = await new TestClient(ctx.app).register(`  ${name.toUpperCase()}  `, 'pw');
+    expect(again.status).toBe(409);
   });
 });
 

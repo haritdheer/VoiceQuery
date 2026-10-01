@@ -17,12 +17,26 @@ import { config } from '../config/env.ts';
 import { requireAuth, requireCsrf, sendError } from '../lib/http.ts';
 import { logger } from '../lib/logger.ts';
 
+/**
+ * Deliberately permissive: this is a portfolio demo, and anything that looks
+ * like a sign-up form stops people trying it. No email format is required and
+ * no minimum password length is imposed — "demo"/"demo" is a valid account.
+ *
+ * Nothing is ever sent to the address, so requiring a real one bought nothing.
+ * The field stays named `email` because it is the account's unique identity
+ * and the column it lives in; it is simply a username now.
+ *
+ * Still trimmed and lower-cased so " Demo " and "demo" are the same account
+ * rather than two, and still length-capped so the column cannot be used as a
+ * storage dump.
+ */
 const CredentialsSchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email('Enter a valid email address.')),
-  password: z
+  email: z
     .string()
-    .min(8, 'Use at least 8 characters.')
-    .max(200, 'That password is too long.'),
+    .trim()
+    .toLowerCase()
+    .pipe(z.string().min(1, 'Enter a username.').max(254, 'That is too long.')),
+  password: z.string().min(1, 'Enter a password.').max(200, 'That password is too long.'),
 });
 
 /**
@@ -148,7 +162,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         reply,
         409,
         'email_taken',
-        'An account with that email already exists. Try signing in.',
+        'That username is already taken. Try signing in instead.',
       );
     }
 
@@ -174,7 +188,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/auth/login', async (request, reply) => {
     const parsed = CredentialsSchema.safeParse(request.body);
     if (!parsed.success) {
-      return sendError(reply, 400, 'validation', 'Enter your email and password.', 'validation');
+      return sendError(reply, 400, 'validation', 'Enter a username and password.', 'validation');
     }
     const { email, password } = parsed.data;
 
@@ -187,12 +201,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     if (!user) {
       // Spend comparable CPU so timing does not reveal whether the account exists.
       await fakeVerify();
-      return sendError(reply, 401, 'invalid_credentials', 'Incorrect email or password.');
+      return sendError(reply, 401, 'invalid_credentials', 'Incorrect username or password.');
     }
 
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
-      return sendError(reply, 401, 'invalid_credentials', 'Incorrect email or password.');
+      return sendError(reply, 401, 'invalid_credentials', 'Incorrect username or password.');
     }
 
     // An account created before the grant logic (or by a failed migration)

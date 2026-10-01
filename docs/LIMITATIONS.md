@@ -161,3 +161,15 @@ Not done: a third-party penetration test, formal threat model document, account
 lockout / brute-force throttling on login beyond the global rate limit, email
 verification, or password reset. Treat this as a portfolio demonstration, and do
 not put confidential data in it.
+
+**Credentials are deliberately unrestricted.** Any non-empty username and any
+non-empty password are accepted — no email format, no minimum length. This is
+a demo that people should be able to try in five seconds, and since nothing is
+ever mailed to the address, requiring a real one bought nothing.
+
+The consequence worth knowing: an obvious account like `demo`/`demo` will be
+taken by the first visitor who tries it, and whoever guesses the same pair
+lands in that account and sees any CSV uploaded there. Uploads expire after
+`DATASET_TTL_HOURS`, which bounds it, but it is a real consequence of the
+choice rather than an oversight. Passwords are still scrypt-hashed, and
+sessions, CSRF and cross-user isolation are unchanged.

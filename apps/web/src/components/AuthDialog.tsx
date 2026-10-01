@@ -60,29 +60,35 @@ export function AuthDialog({
       <form onSubmit={submit} className="space-y-4">
         {error && <Alert tone="critical">{error}</Alert>}
 
-        <Field label="Email" htmlFor="vq-email">
+        {/*
+          type="text", not type="email": the browser would otherwise block
+          anything without an @ before the request is even sent, which is the
+          whole thing being removed here. Nothing is mailed to this address.
+        */}
+        <Field
+          label="Username"
+          htmlFor="vq-email"
+          hint={mode === 'register' ? 'Anything you like — no email needed.' : undefined}
+        >
           <input
             id="vq-email"
-            type="email"
+            type="text"
             required
-            autoComplete="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
-            placeholder="you@example.com"
+            placeholder="demo"
           />
         </Field>
 
-        <Field
-          label="Password"
-          htmlFor="vq-password"
-          hint={mode === 'register' ? 'At least 8 characters.' : undefined}
-        >
+        <Field label="Password" htmlFor="vq-password">
           <input
             id="vq-password"
             type="password"
             required
-            minLength={8}
             autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
