@@ -9,3 +9,6 @@ coverage/
 .DS_Store
 *.tsbuildinfo
 .test-data/
+# Any local data directory, whatever DATA_DIR was pointed at.
+*-test-data/
+.local-*/
