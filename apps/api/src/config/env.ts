@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 /**
@@ -5,6 +7,37 @@ import { z } from 'zod';
  * codebase touches process.env, so every knob is discoverable from here and
  * from .env.example.
  */
+
+/**
+ * Load a local .env, if there is one.
+ *
+ * Done here in code rather than with node's --env-file flag because the dev
+ * server runs under `tsx watch`, which does not pass the flag through to the
+ * process that ends up reading the environment — the file was silently
+ * ignored, so a key pasted into .env as the README instructs did nothing and
+ * the app stayed in demo mode with no clue why.
+ *
+ * Real environment variables win over the file, so this changes nothing on a
+ * host like Railway that injects them directly — and there is no .env in the
+ * container image anyway.
+ *
+ * Skipped under test: the suite sets what it needs explicitly, and a
+ * developer's .env (a provider key, say) would otherwise quietly change which
+ * provider the tests resolve.
+ */
+if (process.env.NODE_ENV !== 'test') {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [
+    path.resolve(here, '../../../../.env'), // repo root
+    path.resolve(here, '../../.env'), // apps/api
+  ]) {
+    try {
+      process.loadEnvFile(candidate);
+    } catch {
+      // No file there. The only expected outcome for at least one of the two.
+    }
+  }
+}
 
 const bool = (def: boolean) =>
   z
