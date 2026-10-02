@@ -55,7 +55,15 @@ question about the seeded sample dataset straight away.
 
 The app speaks only Postgres. With no `DATABASE_URL` it falls back to
 [PGlite](https://pglite.dev) — genuine Postgres compiled to WebAssembly — so the
-repo runs with zero setup. To use a real server:
+repo runs with zero setup.
+
+PGlite is a single embedded instance, so killing the dev server rather than
+stopping it can leave the cluster locked or half-written and the next start
+fails. The error says so and tells you to `rm -rf apps/api/.data/pglite` —
+safe, because it holds only local accounts and chat history, and the sample
+dataset re-seeds on the next start.
+
+To use a real server: 
 
 ```bash
 docker compose up -d db

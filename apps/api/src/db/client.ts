@@ -59,7 +59,37 @@ async function createPgliteDb(dataDir: string): Promise<Db> {
     await mkdir(path.dirname(path.resolve(dataDir)), { recursive: true });
   }
 
-  const pg = await PGlite.create(dataDir);
+  /*
+   * A corrupt or still-locked data directory surfaces as a bare WASM
+   * `RuntimeError: Aborted()` with a stack full of `wasm-function[13300]`
+   * and no mention of Postgres, the directory, or what to do — which reads
+   * like the app is broken rather than like local state needs clearing.
+   *
+   * The usual cause is a dev server killed hard: PGlite is a single embedded
+   * instance, so it leaves a postmaster.pid behind and can leave the cluster
+   * mid-write. Deleting the directory is safe here and nowhere else —
+   * production is real Postgres, and the sample dataset re-seeds on boot.
+   */
+  const pg = await PGlite.create(dataDir).catch((err: unknown) => {
+    if (dataDir.startsWith('memory://')) throw err;
+    throw new Error(
+      [
+        `The local database at ${dataDir} could not be opened.`,
+        '',
+        'This is usually a dev server that was killed rather than stopped,',
+        'leaving the embedded Postgres cluster locked or half-written.',
+        '',
+        'It holds only local accounts and chat history. To reset it:',
+        '',
+        `  rm -rf ${dataDir}`,
+        '',
+        'The sample dataset is recreated on the next start.',
+        '',
+        `Original error: ${err instanceof Error ? err.message : String(err)}`,
+      ].join('\n'),
+      { cause: err },
+    );
+  });
 
   type Queryable = { query: (t: string, p?: unknown[]) => Promise<{ rows: unknown[] }> };
 
