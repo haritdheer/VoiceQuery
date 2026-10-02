@@ -27,7 +27,7 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 
 ---
 
-## Backend — 189 tests
+## Backend — 197 tests
 
 | File | Tests | Covers |
 |---|---|---|
@@ -35,9 +35,10 @@ compiled to WASM), so constraints, transactions and SQL semantics are real.
 | `credits.test.ts` | 20 | ledger, idempotency, concurrency, BYOK, demo cost |
 | `analysis.test.ts` | 18 | pipeline, sandbox, row bounding |
 | `csv.test.ts` | 15 | parsing, inference, messy input |
-| `access.test.ts` | 13 | auth, CSRF, cross-user isolation |
+| `access.test.ts` | 15 | auth, CSRF, cross-user isolation |
 | `platformFailure.test.ts` | 4 | operator key rejected: 503, refund, message hygiene |
 | `guest.test.ts` | 13 | anonymous sessions, cost boundary, restrictions, ceiling |
+| `download.test.ts` | 6 | CSV export: escaping, round-trip, ownership |
 | `migrate.test.ts` | 7 | fresh schema, re-runnability, upgrading an older database |
 | `providers.test.ts` | 32 | catalogue, adapter dispatch, platform selection, BYOK per provider, error wording |
 
@@ -106,7 +107,7 @@ ordinary retryable 502 rather than sending the user to the key form.
 
 ---
 
-## Frontend — 72 tests
+## Frontend — 74 tests
 
 | Area | Tests | Covers |
 |---|---|---|

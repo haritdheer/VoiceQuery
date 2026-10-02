@@ -69,6 +69,10 @@ export function DatasetPanel({
     }
   }
 
+  // The sample doubles as the worked example in the upload dialog: it is the
+  // one file guaranteed to be present and guaranteed to parse cleanly.
+  const sampleDatasetId = datasets.find((d) => d.kind === 'sample')?.id ?? null;
+
   function openUploadDialog() {
     // A message left over from a previous attempt would read as a failure of
     // the upload the user is only just starting.
@@ -129,23 +133,49 @@ export function DatasetPanel({
                     </span>
                   </button>
 
-                  {dataset.kind === 'upload' && (
-                    <button
-                      type="button"
-                      onClick={() => void remove(dataset.id, dataset.name)}
-                      aria-label={`Delete dataset ${dataset.name}`}
-                      className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-[var(--critical)]"
+                  <span className="flex shrink-0 items-center">
+                    {/*
+                      An anchor, not a button with JS: the browser downloads it
+                      natively straight to disk instead of the page buffering
+                      a whole dataset in memory to hand back.
+                    */}
+                    <a
+                      href={api.datasetDownloadUrl(dataset.id)}
+                      download={`${dataset.name}.csv`}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Download as CSV"
+                      aria-label={`Download ${dataset.name} as CSV`}
+                      className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-[var(--accent)]"
                     >
                       <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                         <path
-                          d="M3 4.5h10M6.5 4.5V3.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1M4.5 4.5l.5 8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-8"
+                          d="M8 2.5v7.5m0 0L5.25 7.25M8 10l2.75-2.75M3 11.5v1a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1"
                           stroke="currentColor"
                           strokeWidth="1.3"
                           strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
-                    </button>
-                  )}
+                    </a>
+
+                    {dataset.kind === 'upload' && (
+                      <button
+                        type="button"
+                        onClick={() => void remove(dataset.id, dataset.name)}
+                        aria-label={`Delete dataset ${dataset.name}`}
+                        className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-[var(--critical)]"
+                      >
+                        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                          <path
+                            d="M3 4.5h10M6.5 4.5V3.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1M4.5 4.5l.5 8a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l.5-8"
+                            stroke="currentColor"
+                            strokeWidth="1.3"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
                 </div>
               </li>
             );
@@ -232,6 +262,7 @@ export function DatasetPanel({
             if (ok) setUploadOpen(false);
           });
         }}
+        sampleDownloadUrl={sampleDatasetId ? api.datasetDownloadUrl(sampleDatasetId) : null}
       />
 
       {/* ------------------------------- schema ------------------------------ */}

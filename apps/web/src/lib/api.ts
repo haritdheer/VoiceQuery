@@ -205,4 +205,16 @@ export const api = {
   async disconnectByok() {
     return request<{ connected: boolean }>('DELETE', '/api/byok');
   },
+
+  /**
+   * URL for downloading a dataset as CSV.
+   *
+   * A plain URL rather than a fetch: the browser's own download handling
+   * streams it straight to disk, where fetching it here would buffer the
+   * whole file in memory first just to hand it back. Same origin, so the
+   * session cookie is sent with the navigation.
+   */
+  datasetDownloadUrl(datasetId: string): string {
+    return `${BASE}/api/datasets/${encodeURIComponent(datasetId)}/download`;
+  },
 };

@@ -51,6 +51,7 @@ export function UploadCsvModal({
   error,
   hint,
   onFile,
+  sampleDownloadUrl,
 }: {
   open: boolean;
   onClose: () => void;
@@ -59,6 +60,8 @@ export function UploadCsvModal({
   error: string | null;
   hint: string | null;
   onFile: (file: File) => void;
+  /** When present, offers the sample dataset as a worked format example. */
+  sampleDownloadUrl?: string | null;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -116,6 +119,25 @@ export function UploadCsvModal({
             as <code className="font-mono">order_date</code>. Duplicate names are numbered rather
             than dropped.
           </p>
+
+          {sampleDownloadUrl && (
+            <a
+              href={sampleDownloadUrl}
+              download="sample-format.csv"
+              className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent)] hover:underline"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M8 2.5v7.5m0 0L5.25 7.25M8 10l2.75-2.75M3 11.5v1a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Download the sample as CSV to see a real one
+            </a>
+          )}
         </section>
 
         {/* ------------------------------- rules ------------------------------ */}

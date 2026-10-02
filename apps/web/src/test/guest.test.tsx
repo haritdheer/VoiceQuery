@@ -24,6 +24,7 @@ vi.mock('../lib/api.ts', () => ({
     byokStatus: vi.fn(),
     connectByok: vi.fn(),
     disconnectByok: vi.fn(),
+    datasetDownloadUrl: (id: string) => '/api/datasets/' + id + '/download',
   },
   ApiRequestError: class ApiRequestError extends Error {
     constructor(

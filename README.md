@@ -258,6 +258,7 @@ What a guest can do:
 | Follow-up questions, conversation history | yes | yes |
 | Charts, result tables, generated SQL | yes | yes |
 | **Real AI answers** | no — always the demo provider | yes |
+| Download a dataset as CSV | sample only | own uploads and the sample |
 | Upload a CSV | no | yes |
 | Connect your own API key | no | yes |
 

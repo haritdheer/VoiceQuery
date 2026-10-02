@@ -34,6 +34,7 @@ vi.mock('../lib/api.ts', () => ({
     byokStatus: vi.fn(),
     connectByok: vi.fn(),
     disconnectByok: vi.fn(),
+    datasetDownloadUrl: (id: string) => '/api/datasets/' + id + '/download',
   },
   ApiRequestError: class ApiRequestError extends Error {
     constructor(
@@ -591,6 +592,33 @@ describe('bring your own key', () => {
     const input = screen.getByLabelText(/API key/);
     expect(input).toHaveAttribute('type', 'password');
     expect(input).toHaveAttribute('autocomplete', 'off');
+  });
+});
+
+/* ------------------------------ CSV download ------------------------------ */
+
+describe('downloading a dataset', () => {
+  it('offers every dataset as a CSV download', async () => {
+    renderDashboard(SESSION(2));
+    const link = await screen.findByRole('link', {
+      name: 'Download Sample: Retail Sales 2024 as CSV',
+    });
+
+    // An anchor, not a button: the browser streams it to disk itself rather
+    // than the page buffering a whole dataset in memory.
+    expect(link).toHaveAttribute('href', '/api/datasets/sample-sales/download');
+    expect(link).toHaveAttribute('download', 'Sample: Retail Sales 2024.csv');
+  });
+
+  it('offers the sample as a worked example inside the upload dialog', async () => {
+    const user = userEvent.setup();
+    renderDashboard(SESSION(2));
+    await screen.findByText('Sample: Retail Sales 2024');
+    await user.click(screen.getByRole('button', { name: 'Upload CSV' }));
+
+    const dialog = within(await screen.findByRole('dialog'));
+    const link = dialog.getByRole('link', { name: /Download the sample as CSV/ });
+    expect(link).toHaveAttribute('href', '/api/datasets/sample-sales/download');
   });
 });
 

@@ -87,7 +87,9 @@ export class TestClient {
     } catch {
       json = {};
     }
-    return { status: res.statusCode, body: json, headers: res.headers };
+    // `text` carries the unparsed payload, for responses that are not JSON
+    // — a CSV export, say, where `body` is an empty object.
+    return { status: res.statusCode, body: json, text: res.payload, headers: res.headers };
   }
 
   async register(email: string, password = 'hunter2hunter2') {

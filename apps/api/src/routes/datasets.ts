@@ -9,6 +9,7 @@ import {
   loadDataset,
 } from '../datasets/store.ts';
 import { CsvValidationError } from '../datasets/csv.ts';
+import { exportDatasetCsv } from '../analytics/duckdb.ts';
 import { SAMPLE_QUESTIONS } from '../datasets/sample.ts';
 import { safeErrorMessage } from '../lib/logger.ts';
 
@@ -40,6 +41,61 @@ export async function datasetRoutes(app: FastifyInstance): Promise<void> {
       dataset: safe,
       exampleQuestions: dataset.kind === 'sample' ? SAMPLE_QUESTIONS : [],
     };
+  });
+
+  /**
+   * Downloads a dataset as CSV.
+   *
+   * Reconstructed from DuckDB rather than served from a stored original —
+   * the uploaded file is parsed and discarded, never kept on disk. So this
+   * returns the data *as the engine holds it*: sanitised column names,
+   * inferred types, decoration stripped from numbers and dates normalised to
+   * ISO. That makes it genuinely useful as a format reference, because it is
+   * exactly the shape the generated SQL is written against.
+   *
+   * Ownership is enforced by loadDataset, same as every other read: another
+   * user's id is a 404, and guests reach only the sample.
+   */
+  app.get('/api/datasets/:id/download', async (request, reply) => {
+    const session = await requireAuth(request, reply);
+    if (!session) return reply;
+
+    const params = IdParams.safeParse(request.params);
+    if (!params.success) return sendError(reply, 400, 'validation', 'Invalid dataset id.');
+
+    const dataset = await loadDataset(request.db, params.data.id, session.user.id);
+    if (!dataset) {
+      return sendError(reply, 404, 'not_found', 'That dataset is not available.');
+    }
+
+    // The name comes from a user-supplied filename, so it is rebuilt from a
+    // safe character set rather than trusted — a quote or newline in a
+    // Content-Disposition header is a header-injection bug.
+    const safeName =
+      dataset.name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) ||
+      'dataset';
+
+    reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${safeName}.csv"`)
+      // The row count is known but the byte length is not until it is built,
+      // so this is sent without content-length rather than buffering it all
+      // to compute one.
+      .header('cache-control', 'no-store');
+
+    try {
+      const parts: string[] = [];
+      await exportDatasetCsv({
+        storagePath: dataset.storagePath,
+        onChunk: (text) => {
+          parts.push(text);
+        },
+      });
+      return reply.send(parts.join(''));
+    } catch (err) {
+      request.log.error({ err, datasetId: dataset.id }, 'dataset export failed');
+      return sendError(reply, 500, 'export_failed', 'That dataset could not be exported.');
+    }
   });
 
   // Uploads get their own, tighter limit on top of the global one: each one

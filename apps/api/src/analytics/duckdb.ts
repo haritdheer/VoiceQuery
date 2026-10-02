@@ -185,6 +185,69 @@ export async function runAnalyticalQuery(opts: RunOptions): Promise<QueryResult>
   });
 }
 
+/* --------------------------------- export --------------------------------- */
+
+/**
+ * RFC 4180 field escaping.
+ *
+ * A field is quoted when it contains a delimiter, a quote, a newline, or
+ * leading/trailing whitespace that a reader would otherwise strip. Embedded
+ * quotes are doubled. `null` becomes an empty field, which is what our own
+ * parser reads back as missing — so an export round-trips through an import.
+ */
+function csvField(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  return /[",\r\n]/.test(s) || s !== s.trim() ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export interface CsvExportOptions {
+  storagePath: string;
+  timeoutMs?: number;
+  /** Rows per emitted chunk. */
+  chunkRows?: number;
+  /** Called with each piece of CSV text, in order. */
+  onChunk: (text: string) => void | Promise<void>;
+}
+
+/**
+ * Streams a whole dataset back out as CSV.
+ *
+ * One query, read incrementally — not paginated with LIMIT/OFFSET. Separate
+ * paged queries have no guaranteed ordering between them, so a row could
+ * appear twice or not at all in the exported file; a single streamed result
+ * cannot.
+ *
+ * Column names are the sanitised ones, which is deliberate: they are what the
+ * generated SQL refers to, so a downloaded file matches what you saw in the
+ * SQL panel and re-uploads to the identical schema.
+ */
+export async function exportDatasetCsv(opts: CsvExportOptions): Promise<number> {
+  const timeoutMs = opts.timeoutMs ?? config().QUERY_TIMEOUT_MS;
+  const chunkRows = opts.chunkRows ?? 5_000;
+
+  return withConnection(opts.storagePath, timeoutMs, async (conn) => {
+    const reader = await conn.streamAndRead(`SELECT * FROM ${DATASET_TABLE}`);
+    const columns = reader.columnNames();
+    await opts.onChunk(columns.map(csvField).join(',') + '\n');
+
+    let emitted = 0;
+    for (;;) {
+      await reader.readUntil(emitted + chunkRows);
+      const buffered = reader.getRowObjectsJson() as Record<string, unknown>[];
+      if (buffered.length > emitted) {
+        const lines = buffered
+          .slice(emitted)
+          .map((row) => columns.map((c) => csvField(row[c])).join(','));
+        await opts.onChunk(lines.join('\n') + '\n');
+        emitted = buffered.length;
+      }
+      if (reader.done && emitted >= buffered.length) break;
+    }
+    return emitted;
+  });
+}
+
 /* ------------------------------- ingestion -------------------------------- */
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
