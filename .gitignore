@@ -3,7 +3,9 @@ dist/
 .env
 .env.local
 *.log
+# Local database and dataset storage, under any DATA_DIR name.
 .data/
+.data-*/
 .pglite/
 coverage/
 .DS_Store
