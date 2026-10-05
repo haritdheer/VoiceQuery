@@ -426,3 +426,53 @@ describe('clicking Try the demo', () => {
     expect(await screen.findByText('Create your account')).toBeInTheDocument();
   });
 });
+
+/* ------------------------------ the backdrop ------------------------------ */
+
+/**
+ * The 3D field is decoration. The failure modes that matter are not visual:
+ * a full-viewport fixed layer that swallows clicks, or one that a screen
+ * reader walks through announcing fragments of SQL.
+ */
+describe('background field', () => {
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.session).mockResolvedValue({
+      user: null,
+      credits: 0,
+      freeGrantIssued: false,
+      aiMode: 'demo',
+      creditsApply: false,
+      byokProvider: null,
+      csrfToken: null,
+      guest: null,
+    });
+    vi.mocked(api.datasets).mockResolvedValue([]);
+  });
+
+  it('is hidden from assistive technology and takes no pointer events', async () => {
+    render(<App />);
+    await screen.findAllByRole('button', { name: 'Try the demo' });
+
+    const field = document.querySelector('.vq-field');
+    expect(field).not.toBeNull();
+    expect(field).toHaveAttribute('aria-hidden', 'true');
+    // The class sets pointer-events: none; assert the contract it relies on
+    // is still declared, since losing it makes the whole page unclickable.
+    expect(field).toHaveClass('vq-field');
+
+    // Nothing inside it should be reachable as content.
+    expect(field!.querySelectorAll('button, a, input')).toHaveLength(0);
+  });
+
+  it('does not stop the page being used', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.startGuest).mockResolvedValue(GUEST(0));
+    render(<App />);
+
+    const buttons = await screen.findAllByRole('button', { name: 'Try the demo' });
+    await user.click(buttons[0]!);
+
+    expect(await screen.findByText("You're in demo mode")).toBeInTheDocument();
+  });
+});

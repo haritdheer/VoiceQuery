@@ -275,7 +275,7 @@ export function Dashboard({
   );
 
   return (
-    <div className={`flex h-full flex-col bg-[var(--surface-0)] ${FOOTER_SPACER_CLASS}`}>
+    <div className={`relative z-10 flex h-full flex-col ${FOOTER_SPACER_CLASS}`}>
       {/* --------------------------------- header -------------------------------- */}
       <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-1)]">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">

@@ -59,7 +59,7 @@ export function Landing({
   realAiActive?: boolean;
 }) {
   return (
-    <div className={`min-h-full bg-[var(--surface-0)] ${FOOTER_SPACER_CLASS}`}>
+    <div className={`relative z-10 min-h-full ${FOOTER_SPACER_CLASS}`}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[var(--accent)] focus:px-4 focus:py-2 focus:text-[var(--on-accent)]"

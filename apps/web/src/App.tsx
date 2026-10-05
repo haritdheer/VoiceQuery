@@ -9,6 +9,7 @@ import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { GuestNudgeModal } from './components/GuestNudgeModal.tsx';
 import { DemoIntroModal } from './components/DemoIntroModal.tsx';
 import { AppFooter } from './components/AppFooter.tsx';
+import { QueryField } from './components/QueryField.tsx';
 import { Alert, Spinner } from './components/ui.tsx';
 
 type Route = 'landing' | 'app';
@@ -188,6 +189,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/*
+        Fixed behind everything. Fainter on the dashboard, where a busy
+        backdrop would work against the one thing the app is selling —
+        numbers you can check.
+      */}
+      <QueryField intensity={route === 'app' && signedIn ? 'app' : 'landing'} />
 
       {route === 'app' && signedIn ? (
         <Dashboard

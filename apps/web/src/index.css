@@ -204,3 +204,72 @@ body {
 .recharts-surface:focus {
   outline: none;
 }
+
+/* ------------------------- 3D query-field backdrop ------------------------ */
+
+/*
+ * Depth without a 3D engine. Each panel is a real element in a perspective
+ * space, so it gets genuine parallax and foreshortening — but every frame is
+ * pure transform/opacity, which the compositor handles on the GPU without
+ * touching layout, paint, or the main thread.
+ *
+ * Three.js would have been ~600KB of JavaScript, a canvas to keep in sync
+ * with the theme, and a render loop competing with the app, to draw text and
+ * rectangles that the browser already draws better.
+ *
+ * The global prefers-reduced-motion rule above stops all of this; the panels
+ * stay where they are, which still reads as an intentional backdrop.
+ */
+.vq-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  perspective: 1100px;
+  perspective-origin: 50% 40%;
+  pointer-events: none;
+  /* Keeps the panels from crowding the content they sit behind. */
+  mask-image: radial-gradient(ellipse 85% 70% at 50% 45%, transparent 35%, black 100%);
+}
+
+.vq-field-panel {
+  position: absolute;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  padding: 10px 12px;
+  box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.5);
+  animation-name: vq-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+/*
+ * One keyframe set, varied per panel by the custom properties below, so a
+ * dozen panels cost one animation definition instead of a dozen.
+ */
+@keyframes vq-drift {
+  from {
+    transform: translate3d(0, 0, var(--vq-z, 0px)) rotateX(var(--vq-rx, 0deg))
+      rotateY(var(--vq-ry, 0deg));
+  }
+  to {
+    transform: translate3d(var(--vq-dx, 0px), var(--vq-dy, -26px), var(--vq-z2, 0px))
+      rotateX(calc(var(--vq-rx, 0deg) + 4deg)) rotateY(calc(var(--vq-ry, 0deg) - 5deg));
+  }
+}
+
+.vq-field-sql {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre;
+  color: var(--text-muted);
+}
+.vq-field-kw {
+  color: var(--accent);
+  font-weight: 600;
+}
