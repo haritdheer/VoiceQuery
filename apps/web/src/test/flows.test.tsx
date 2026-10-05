@@ -1291,3 +1291,83 @@ describe('auth dialog mode', () => {
     );
   });
 });
+
+/* ------------------------------- history -------------------------------- */
+
+/**
+ * The server has stored conversations since the first release and the typed
+ * client has had both endpoints — nothing ever called them, so signing back
+ * in dropped you on an empty dashboard with your history intact and
+ * unreachable.
+ */
+describe('conversation history', () => {
+  const PAST = {
+    id: 'c-old',
+    // Deliberately unlike the sample's example questions, which are also
+    // on screen as buttons.
+    title: 'Revenue by region in March',
+    datasetId: 'ds-other',
+    datasetName: 'my-sales',
+    messageCount: 2,
+    createdAt: new Date(Date.now() - 86_400_000).toISOString(),
+    updatedAt: new Date(Date.now() - 3_600_000).toISOString(),
+  };
+
+  it('lists past conversations and reopens one', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.conversations).mockResolvedValue([PAST]);
+    vi.mocked(api.conversation).mockResolvedValue({
+      ...PAST,
+      messages: [ANSWER({ answer: 'Restored from history.' })],
+    });
+
+    renderDashboard(SESSION(5));
+    await user.click(await screen.findByRole('button', { name: 'History' }));
+
+    expect(await screen.findByText(PAST.title)).toBeInTheDocument();
+    expect(screen.getByText(/my-sales · 2 messages/)).toBeInTheDocument();
+
+    await user.click(screen.getByText(PAST.title));
+    expect(await screen.findByText('Restored from history.')).toBeInTheDocument();
+  });
+
+  it('switches to the dataset the conversation belongs to', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.conversations).mockResolvedValue([PAST]);
+    vi.mocked(api.conversation).mockResolvedValue({ ...PAST, messages: [ANSWER()] });
+
+    renderDashboard(SESSION(5));
+    await user.click(await screen.findByRole('button', { name: 'History' }));
+    await user.click(await screen.findByText(PAST.title));
+
+    /*
+     * A conversation is bound to its dataset server-side — the analyse
+     * endpoint refuses a follow-up arriving against a different one.
+     * Restoring the messages without rebinding the dataset would look
+     * correct and then fail on the very next question.
+     */
+    await waitFor(() => expect(api.dataset).toHaveBeenCalledWith('ds-other'));
+  });
+
+  it('says so when there is nothing yet, rather than showing an empty box', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.conversations).mockResolvedValue([]);
+
+    renderDashboard(SESSION(5));
+    await user.click(await screen.findByRole('button', { name: 'History' }));
+
+    expect(await screen.findByText(/Nothing here yet/)).toBeInTheDocument();
+  });
+
+  it('reports a failure instead of looking empty', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.conversations).mockRejectedValue(new Error('offline'));
+
+    renderDashboard(SESSION(5));
+    await user.click(await screen.findByRole('button', { name: 'History' }));
+
+    // An empty list and a failed request must not look the same.
+    expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing here yet/)).not.toBeInTheDocument();
+  });
+});

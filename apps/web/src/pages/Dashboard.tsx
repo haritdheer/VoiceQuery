@@ -16,6 +16,7 @@ import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
 import type { ConnectKeyReason } from '../components/ConnectKeyModal.tsx';
 import { HeaderMenu } from '../components/HeaderMenu.tsx';
 import { DemoBadge } from '../components/DemoBadge.tsx';
+import { HistoryModal } from '../components/HistoryModal.tsx';
 
 /**
  * The working surface: dataset selection on the left, conversation on the right.
@@ -66,6 +67,7 @@ export function Dashboard({
   const [error, setError] = useState<string | null>(null);
   const [loadingDatasets, setLoadingDatasets] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -243,6 +245,28 @@ export function Dashboard({
     setError(null);
   }, []);
 
+  /**
+   * Reopens a stored conversation.
+   *
+   * The dataset is switched to the one it was started on, because a
+   * conversation is bound to its dataset server-side — the analyse endpoint
+   * refuses a follow-up that arrives pointing somewhere else. Restoring the
+   * messages without the dataset would look right and then fail on the
+   * first follow-up question.
+   */
+  const openConversation = useCallback(async (id: string) => {
+    setError(null);
+    try {
+      const detail = await api.conversation(id);
+      setSelectedId(detail.datasetId);
+      setMessages(detail.messages);
+      setConversationId(detail.id);
+      setSidebarOpen(false);
+    } catch {
+      setError('That conversation could not be opened.');
+    }
+  }, []);
+
   function selectDataset(id: string) {
     if (id === selectedId) return;
     setSelectedId(id);
@@ -405,6 +429,9 @@ export function Dashboard({
 
             {/* From sm up there is room for these inline. */}
             <div className="hidden items-center gap-2 sm:flex">
+              <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
+                History
+              </Button>
               {messages.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={startNewConversation}>
                   New chat
@@ -435,6 +462,7 @@ export function Dashboard({
                 label="Menu"
                 items={[
                   { label: sidebarOpen ? 'Hide datasets' : 'Datasets', onSelect: () => setSidebarOpen((v) => !v) },
+                  { label: 'History', onSelect: () => setHistoryOpen(true) },
                   ...(messages.length > 0
                     ? [{ label: 'New chat', onSelect: startNewConversation }]
                     : []),
@@ -552,6 +580,16 @@ export function Dashboard({
           {demoLocked && <RealAiGate onConnectKey={() => onConnectKey?.('demo')} />}
         </main>
       </div>
+
+      <HistoryModal
+        open={historyOpen}
+        currentId={conversationId}
+        onClose={() => setHistoryOpen(false)}
+        onPick={(id) => {
+          setHistoryOpen(false);
+          void openConversation(id);
+        }}
+      />
     </div>
   );
 }
