@@ -571,3 +571,43 @@ describe('landing page for a guest mid-demo', () => {
     expect(screen.queryByRole('button', { name: 'Get real answers' })).not.toBeInTheDocument();
   });
 });
+
+/* --------------------- the explainer on every way in ---------------------- */
+
+/**
+ * The intro was raised only where the guest session is created, so it showed
+ * once per browser and never again — which after a first visit is never, for
+ * everyone. A returning guest clicking "Try the demo" went straight to the
+ * dashboard with no indication that the answers are simulated.
+ */
+describe('demo explainer', () => {
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.datasets).mockResolvedValue([]);
+  });
+
+  it('shows for a visitor whose guest session already exists', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.session).mockResolvedValue(GUEST(4));
+    render(<App />);
+
+    await user.click((await screen.findAllByRole('button', { name: 'Try the demo' }))[0]!);
+
+    expect(await screen.findByText("You're in demo mode")).toBeInTheDocument();
+    // No second session was opened for someone who already had one.
+    expect(api.startGuest).not.toHaveBeenCalled();
+  });
+
+  it('does not show for a real account', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.session).mockResolvedValue({
+      ...GUEST(0),
+      user: { id: 'u1', email: 'someone', isGuest: false, createdAt: new Date().toISOString() },
+      guest: null,
+    });
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Open dashboard' }));
+    expect(screen.queryByText("You're in demo mode")).not.toBeInTheDocument();
+  });
+});

@@ -82,6 +82,17 @@ export default function App() {
   async function tryDemo() {
     if (session?.user) {
       navigate('app');
+      /*
+       * A guest coming back in gets the explainer too. It used to be raised
+       * only where the session is created below, so it appeared exactly once
+       * per browser, ever — and never again for anyone who already had a
+       * guest session, which after a single visit is everyone. "Try the
+       * demo" should always say what the demo is.
+       *
+       * Not for a real account: they are not in demo mode, and their button
+       * says "Open VoiceQuery" anyway.
+       */
+      if (session.user.isGuest) setDemoIntroOpen(true);
       return;
     }
     // Guest mode switched off at the deployment: an account genuinely is the
