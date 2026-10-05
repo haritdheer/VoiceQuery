@@ -844,18 +844,24 @@ describe('free-allowance copy', () => {
   const FREE_DEMO = { ...METERED, demoMode: true, creditsEnabled: false };
 
   it('promises free questions when credits are actually metered', () => {
-    render(<Landing config={METERED} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
-    expect(screen.getByText(/5 free questions when you sign up/)).toBeInTheDocument();
+    render(<Landing config={METERED} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    expect(screen.getByText(/5 free questions with an account/)).toBeInTheDocument();
   });
 
+  /**
+   * The promise has to track where the questions would actually come from.
+   * On a deployment with no provider key of its own, an account gets you the
+   * bring-your-own-key form, not five free answers — so the landing page must
+   * not say otherwise.
+   */
   it('does not promise a free allowance when nothing is metered', () => {
-    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
-    expect(screen.queryByText(/free questions when you sign up/)).not.toBeInTheDocument();
-    expect(screen.getByText(/unlimited questions in demo mode/)).toBeInTheDocument();
+    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    expect(screen.queryByText(/free questions with an account/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Bring your own API key/)).toBeInTheDocument();
   });
 
   it('labels demo mode on the landing page', () => {
-    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
+    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(
       screen.getByText(/answers come from a local stand-in, not an AI model/),
     ).toBeInTheDocument();
@@ -1098,12 +1104,12 @@ describe('header reflects who is actually answering', () => {
 
   it('drops the landing-page demo banner for a BYOK visitor', () => {
     const { rerender } = render(
-      <Landing config={DEMO_DEPLOYMENT} signedIn onTryDemo={noop} onSignIn={noop} />,
+      <Landing config={DEMO_DEPLOYMENT} signedIn onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
     );
     expect(screen.getByText(/answers come from a local stand-in/)).toBeInTheDocument();
 
     rerender(
-      <Landing config={DEMO_DEPLOYMENT} signedIn realAiActive onTryDemo={noop} onSignIn={noop} />,
+      <Landing config={DEMO_DEPLOYMENT} signedIn realAiActive onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
     );
     expect(screen.queryByText(/answers come from a local stand-in/)).not.toBeInTheDocument();
   });

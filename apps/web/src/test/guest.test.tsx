@@ -324,19 +324,25 @@ describe('guest nudge modal', () => {
 });
 
 describe('landing copy with guest mode', () => {
-  it('says no sign-up is needed', () => {
-    render(<Landing config={CONFIG} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
-    expect(screen.getByText(/No sign-up needed/)).toBeInTheDocument();
+  it('leads with real answers and offers the demo second', () => {
+    render(<Landing config={CONFIG} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+
+    // Both routes are offered, but the demo is explicitly the lesser one —
+    // leading with it would be selling the simulation rather than the
+    // product.
+    expect(screen.getAllByRole('button', { name: 'Get real answers' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Try the demo' }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/the demo answers are simulated/)).toBeInTheDocument();
   });
 
-  it('falls back to the allowance copy when guest mode is off', () => {
+  it('drops the demo button entirely when guest mode is off', () => {
     const noGuest = {
       ...CONFIG,
       creditsEnabled: true,
       guest: { ...CONFIG.guest, enabled: false },
     };
-    render(<Landing config={noGuest} signedIn={false} onTryDemo={noop} onSignIn={noop} />);
-    expect(screen.queryByText(/No sign-up needed/)).not.toBeInTheDocument();
-    expect(screen.getByText(/2 free questions when you sign up/)).toBeInTheDocument();
+    render(<Landing config={noGuest} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Get real answers' }).length).toBeGreaterThan(0);
   });
 });

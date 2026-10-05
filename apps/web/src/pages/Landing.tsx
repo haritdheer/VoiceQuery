@@ -36,12 +36,19 @@ export function Landing({
   config,
   onTryDemo,
   onSignIn,
+  onGetStarted,
   signedIn,
   realAiActive = false,
 }: {
   config: AppConfigResponse;
   onTryDemo: () => void;
   onSignIn: () => void;
+  /**
+   * The primary call to action: an account, which is what real answers
+   * require. Opens the same dialog as "Sign in" but on the create side,
+   * since a visitor reading the landing page usually has no account yet.
+   */
+  onGetStarted: () => void;
   signedIn: boolean;
   /**
    * True when this visitor's questions reach a real model — because they
@@ -75,8 +82,18 @@ export function Landing({
               <Button variant="ghost" size="sm" onClick={onSignIn}>
                 Sign in
               </Button>
-              <Button size="sm" onClick={onTryDemo}>
-                Try the demo
+              {/*
+                Guarded on guest.enabled, which it was not before: with guest
+                mode off this button opened the sign-up dialog, so it offered
+                a demo that did not exist.
+              */}
+              {config.guest.enabled && (
+                <Button variant="secondary" size="sm" onClick={onTryDemo}>
+                  Try the demo
+                </Button>
+              )}
+              <Button size="sm" onClick={onGetStarted}>
+                Get real answers
               </Button>
             </>
           )}
@@ -107,16 +124,42 @@ export function Landing({
               answer — with the query it used shown in full.
             </p>
 
+            {/*
+              Real answers lead; the demo is the fallback. The demo exists to
+              show how the product works, so offering it as the first thing a
+              visitor clicks sells the simulation rather than the product.
+            */}
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button size="lg" onClick={onTryDemo}>
-                Try the demo
-              </Button>
+              {signedIn ? (
+                <Button size="lg" onClick={onTryDemo}>
+                  Open VoiceQuery
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" onClick={onGetStarted}>
+                    Get real answers
+                  </Button>
+                  {config.guest.enabled && (
+                    <Button size="lg" variant="secondary" onClick={onTryDemo}>
+                      Try the demo
+                    </Button>
+                  )}
+                </>
+              )}
               <span className="text-sm text-[var(--text-secondary)]">
-                {config.guest.enabled
-                  ? 'No sign-up needed · sample dataset already loaded'
+                {signedIn
+                  ? 'Sample dataset already loaded'
                   : config.creditsEnabled
-                    ? `Sample dataset loaded · ${config.freeCredits} free questions when you sign up`
-                    : 'Sample dataset loaded · unlimited questions in demo mode'}
+                    ? // Only promise free questions where an account actually
+                      // gets them — on a deployment with no provider key of
+                      // its own, signing up leads to the bring-your-own-key
+                      // form instead, and saying otherwise would be a lie.
+                      `${config.freeCredits} free questions with an account${
+                        config.guest.enabled ? ' · the demo answers are simulated' : ''
+                      }`
+                    : config.guest.enabled
+                      ? 'An account lets you use your own API key · the demo answers are simulated'
+                      : 'Bring your own API key for real analysis'}
               </span>
             </div>
           </div>
@@ -216,10 +259,23 @@ ORDER BY total_revenue DESC LIMIT 10`}</code>
                 </>
               )}
             </p>
-            <div className="mt-6">
-              <Button size="lg" onClick={onTryDemo}>
-                Try the demo
-              </Button>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {signedIn ? (
+                <Button size="lg" onClick={onTryDemo}>
+                  Open VoiceQuery
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" onClick={onGetStarted}>
+                    Get real answers
+                  </Button>
+                  {config.guest.enabled && (
+                    <Button size="lg" variant="secondary" onClick={onTryDemo}>
+                      Try the demo
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </section>
