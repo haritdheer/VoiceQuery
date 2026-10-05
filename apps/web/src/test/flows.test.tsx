@@ -1227,3 +1227,67 @@ describe('attention ring scoping', () => {
     expect(screen.getByRole('button', { name: 'Menu' })).toHaveClass('vq-attention');
   });
 });
+
+/* ---------------------- the dialog opens on the right side ---------------- */
+
+describe('auth dialog mode', () => {
+  /**
+   * The dialog is always mounted and `open` only controls painting, so
+   * useState captured initialMode at first render and never read it again.
+   * "Sign in" in the header set the mode to login and got the register form
+   * anyway — every returning user was asked to create an account, with the
+   * switch link inside the dialog as the only way through.
+   */
+  it('follows initialMode when reopened, not just at mount', () => {
+    const { rerender } = render(
+      <AuthDialog
+        open={false}
+        initialMode="register"
+        freeCredits={5}
+        creditsEnabled
+        onClose={noop}
+        onAuthenticated={noop}
+      />,
+    );
+
+    rerender(
+      <AuthDialog
+        open
+        initialMode="login"
+        freeCredits={5}
+        creditsEnabled
+        onClose={noop}
+        onAuthenticated={noop}
+      />,
+    );
+
+    expect(screen.getByText('Welcome back')).toBeInTheDocument();
+    expect(screen.queryByText('Create your account')).not.toBeInTheDocument();
+  });
+
+  it('reports which side it authenticated on', async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    vi.mocked(api.register).mockResolvedValue(SESSION(5));
+
+    render(
+      <AuthDialog
+        open
+        initialMode="register"
+        freeCredits={5}
+        creditsEnabled
+        onClose={noop}
+        onAuthenticated={onAuthenticated}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Username'), 'someone');
+    await user.type(screen.getByLabelText('Password'), 'pw');
+    await user.click(screen.getByRole('button', { name: /Create account/ }));
+
+    // The caller needs this to tell a new account from a returning one.
+    await waitFor(() =>
+      expect(onAuthenticated).toHaveBeenCalledWith(expect.anything(), 'register'),
+    );
+  });
+});

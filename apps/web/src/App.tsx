@@ -8,6 +8,7 @@ import { ConnectKeyModal, type ConnectKeyReason } from './components/ConnectKeyM
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { GuestNudgeModal } from './components/GuestNudgeModal.tsx';
 import { DemoIntroModal } from './components/DemoIntroModal.tsx';
+import { DatasetChoiceModal } from './components/DatasetChoiceModal.tsx';
 import { AppFooter } from './components/AppFooter.tsx';
 import { QueryField } from './components/QueryField.tsx';
 import { Alert, Spinner } from './components/ui.tsx';
@@ -33,6 +34,12 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [demoIntroOpen, setDemoIntroOpen] = useState(false);
   const [demoError, setDemoError] = useState<string | null>(null);
+  // Raised only for a brand-new account, to ask what they want to analyse.
+  const [datasetChoiceOpen, setDatasetChoiceOpen] = useState(false);
+  // Bumped to ask the dashboard to open its upload dialog.
+  const [uploadToken, setUploadToken] = useState(0);
+  // Just for the prompt copy; the dashboard loads the real list itself.
+  const [sample, setSample] = useState<{ name: string; rows: number } | null>(null);
   const [nudge, setNudge] = useState<{ open: boolean; blocking: boolean }>({
     open: false,
     blocking: false,
@@ -224,6 +231,7 @@ export default function App() {
           onGuestNudge={(blocking) => setNudge({ open: true, blocking })}
           onSignUp={promptSignUp}
           onBack={() => navigate('landing')}
+          openUploadToken={uploadToken}
         />
       ) : (
         <Landing
@@ -245,10 +253,37 @@ export default function App() {
         freeCredits={config.freeCredits}
         creditsEnabled={config.creditsEnabled}
         onClose={() => setAuthOpen(false)}
-        onAuthenticated={(state) => {
+        onAuthenticated={(state, mode) => {
           setSession(state);
           setAuthOpen(false);
           navigate('app');
+          // Only a new account needs asking. A returning one already has
+          // their datasets and knows where they are.
+          if (mode === 'register') {
+            void api
+              .datasets()
+              .then((list) => {
+                const found = list.find((d) => d.kind === 'sample');
+                if (found) setSample({ name: found.name, rows: found.rowCount });
+              })
+              .catch(() => {
+                /* the prompt reads fine without the sample's details */
+              });
+            setDatasetChoiceOpen(true);
+          }
+        }}
+      />
+
+      <DatasetChoiceModal
+        open={datasetChoiceOpen}
+        sampleName={sample?.name ?? null}
+        sampleRows={sample?.rows ?? null}
+        freeCredits={config.freeCredits}
+        creditsEnabled={config.creditsEnabled}
+        onClose={() => setDatasetChoiceOpen(false)}
+        onUpload={() => {
+          setDatasetChoiceOpen(false);
+          setUploadToken((n) => n + 1);
         }}
       />
 

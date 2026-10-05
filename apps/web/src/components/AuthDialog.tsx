@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SessionState } from '@voicequery/shared';
 import { Alert, Button, Field, Modal, inputClass } from './ui.tsx';
 import { api, ApiRequestError } from '../lib/api.ts';
@@ -13,13 +13,29 @@ export function AuthDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onAuthenticated: (state: SessionState) => void;
+  /** `mode` lets the caller tell a new account from a returning one. */
+  onAuthenticated: (state: SessionState, mode: 'register' | 'login') => void;
   freeCredits: number;
   /** False on a free demo deployment — do not promise a credit allowance. */
   creditsEnabled: boolean;
   initialMode?: 'register' | 'login';
 }) {
   const [mode, setMode] = useState<'register' | 'login'>(initialMode);
+
+  /*
+   * useState reads initialMode once, and this dialog is always mounted —
+   * `open` only controls whether it paints. So the prop was captured at
+   * first render and never looked at again: "Sign in" in the header set the
+   * mode to login, the dialog stayed on the register side it had mounted
+   * with, and every returning user was shown "Create your account". The only
+   * way to the sign-in form was the switch link inside it.
+   */
+  useEffect(() => {
+    if (open) {
+      setMode(initialMode);
+      setError(null);
+    }
+  }, [open, initialMode]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +48,7 @@ export function AuthDialog({
     try {
       const state =
         mode === 'register' ? await api.register(email, password) : await api.login(email, password);
-      onAuthenticated(state);
+      onAuthenticated(state, mode);
       setEmail('');
       setPassword('');
     } catch (err) {

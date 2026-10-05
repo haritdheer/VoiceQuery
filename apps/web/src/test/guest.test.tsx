@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AnalysisResponse, AppConfigResponse, DatasetDetail, SessionState } from '@voicequery/shared';
 
@@ -647,5 +647,92 @@ describe('demo badge', () => {
     // The panel is where uploading lives, and for a guest it is also where
     // the account requirement is explained.
     expect(await screen.findByText(/Uploading a CSV needs a free account/)).toBeInTheDocument();
+  });
+});
+
+/* ----------------------- what a new account is asked ---------------------- */
+
+/**
+ * Drives the whole App so the prompt is reached the way a real sign-up
+ * reaches it, rather than by rendering the dialog directly.
+ */
+describe('after creating an account', () => {
+  const ACCOUNT: SessionState = {
+    user: { id: 'u9', email: 'new', isGuest: false, createdAt: new Date().toISOString() },
+    credits: 5,
+    freeGrantIssued: true,
+    aiMode: 'platform',
+    creditsApply: true,
+    byokProvider: null,
+    csrfToken: 'csrf',
+    guest: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue({ ...CONFIG, creditsEnabled: true, freeCredits: 5 });
+    vi.mocked(api.session).mockResolvedValue({
+      user: null, credits: 0, freeGrantIssued: false, aiMode: 'demo',
+      creditsApply: false, byokProvider: null, csrfToken: null, guest: null,
+    });
+    vi.mocked(api.register).mockResolvedValue(ACCOUNT);
+    vi.mocked(api.login).mockResolvedValue(ACCOUNT);
+  });
+
+  async function signUp(user: ReturnType<typeof userEvent.setup>) {
+    await user.click((await screen.findAllByRole('button', { name: 'Get real answers' }))[0]!);
+    await user.type(await screen.findByLabelText('Username'), 'someone');
+    await user.type(screen.getByLabelText('Password'), 'pw');
+    await user.click(screen.getByRole('button', { name: /Create account/ }));
+  }
+
+  it('asks what to analyse, offering both routes', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await signUp(user);
+
+    expect(await screen.findByText('Your account is ready')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload my own CSV/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Use the sample dataset/ })).toBeInTheDocument();
+  });
+
+  it('opens the upload dialog when they choose their own data', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await signUp(user);
+
+    await user.click(await screen.findByRole('button', { name: /Upload my own CSV/ }));
+
+    // Straight into the real upload flow, not merely a panel they then have
+    // to find the control in.
+    expect(await screen.findByRole('button', { name: 'Choose a CSV file' })).toBeInTheDocument();
+  });
+
+  it('leaves them on the working dashboard if they pick the sample', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await signUp(user);
+
+    await user.click(await screen.findByRole('button', { name: /Use the sample dataset/ }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('Your account is ready')).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: 'Choose a CSV file' })).not.toBeInTheDocument();
+  });
+
+  it('does not ask a returning account', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+    await user.type(await screen.findByLabelText('Username'), 'someone');
+    await user.type(screen.getByLabelText('Password'), 'pw');
+    // The header trigger and the dialog's submit share a label, so scope it.
+    const dialog = within(screen.getByRole('dialog'));
+    await user.click(dialog.getByRole('button', { name: 'Sign in' }));
+
+    // They already have their datasets and know where they are.
+    await waitFor(() => expect(api.login).toHaveBeenCalled());
+    expect(screen.queryByText('Your account is ready')).not.toBeInTheDocument();
   });
 });

@@ -35,6 +35,7 @@ export function Dashboard({
   onSignUp,
   onConnectKey,
   onBack,
+  openUploadToken,
 }: {
   session: SessionState;
   config: AppConfigResponse;
@@ -45,6 +46,8 @@ export function Dashboard({
   /** Raised when a guest should be shown the sign-in nudge. */
   onGuestNudge?: (blocking: boolean) => void;
   onSignUp?: () => void;
+  /** Changing this opens the CSV upload dialog. */
+  openUploadToken?: number;
   /** Leaves the dashboard for the landing page, keeping the session. */
   onBack?: () => void;
   /** Opens the provider-key form directly, with the reason it is showing. */
@@ -257,6 +260,7 @@ export function Dashboard({
         detail={detail}
         limits={config.limits}
         isGuest={isGuest}
+        openUploadToken={openUploadToken}
         onRequestAccount={() => onSignUp?.()}
         onSelect={selectDataset}
         onUploaded={(dataset) => {
@@ -276,7 +280,7 @@ export function Dashboard({
         }}
       />
     ),
-    [datasets, selectedId, detail, config.limits, isGuest],
+    [datasets, selectedId, detail, config.limits, isGuest, openUploadToken],
   );
 
   return (

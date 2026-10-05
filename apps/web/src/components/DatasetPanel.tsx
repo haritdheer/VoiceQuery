@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppConfigResponse, DatasetDetail, DatasetSummary } from '@voicequery/shared';
 import { Alert, Badge, Button, Card, Disclosure, cx } from './ui.tsx';
 import { UploadCsvModal } from './UploadCsvModal.tsx';
@@ -15,6 +15,7 @@ export function DatasetPanel({
   onSelect,
   onUploaded,
   onDeleted,
+  openUploadToken,
 }: {
   datasets: DatasetSummary[];
   selectedId: string | null;
@@ -26,6 +27,11 @@ export function DatasetPanel({
   onSelect: (id: string) => void;
   onUploaded: (dataset: DatasetDetail) => void;
   onDeleted: (id: string) => void;
+  /**
+   * Changing this opens the upload dialog. A token rather than a boolean so
+   * the parent can ask twice without having to reset anything in between.
+   */
+  openUploadToken?: number;
 }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,6 +86,15 @@ export function DatasetPanel({
     setHint(null);
     setUploadOpen(true);
   }
+
+  // Opened from outside — the post-sign-up prompt asking what to analyse.
+  // Guests have no upload route at all, so their token is ignored.
+  useEffect(() => {
+    if (openUploadToken && !isGuest) openUploadDialog();
+    // openUploadDialog only ever resets local state, so it is safe to leave
+    // out; re-running on its identity would reopen the dialog on any render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openUploadToken, isGuest]);
 
   async function remove(id: string, name: string) {
     if (!window.confirm(`Delete "${name}"? This removes the uploaded data permanently.`)) return;
