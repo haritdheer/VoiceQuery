@@ -176,7 +176,13 @@ beforeEach(() => {
   vi.mocked(api.dataset).mockResolvedValue({ dataset: SAMPLE, exampleQuestions: [EXAMPLE] });
 });
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  // navigate() pushes to history, and jsdom keeps the URL across tests in a
+  // file — so without this a later App render starts on /app and never shows
+  // the landing page at all.
+  window.history.replaceState({}, '', '/');
+});
 
 describe('guest dashboard', () => {
   it('lets an anonymous visitor ask without signing in', async () => {
@@ -326,7 +332,7 @@ describe('guest nudge modal', () => {
 
 describe('landing copy with guest mode', () => {
   it('leads with real answers and offers the demo second', () => {
-    render(<Landing config={CONFIG} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={CONFIG} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
 
     // Both routes are offered, but the demo is explicitly the lesser one —
     // leading with it would be selling the simulation rather than the
@@ -342,7 +348,7 @@ describe('landing copy with guest mode', () => {
       creditsEnabled: true,
       guest: { ...CONFIG.guest, enabled: false },
     };
-    render(<Landing config={noGuest} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={noGuest} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Get real answers' }).length).toBeGreaterThan(0);
   });
@@ -508,12 +514,60 @@ describe('back to the landing page', () => {
     // …and back out.
     await user.click(screen.getByRole('button', { name: 'Back to the home page' }));
 
-    // The landing page, and still in session — a signed-in visitor is offered
-    // the way back in, not asked to start over. Logout must not have run.
+    // Back on the landing page, which keeps pitching an account to a guest.
     expect(
-      (await screen.findAllByRole('button', { name: 'Open VoiceQuery' })).length,
+      (await screen.findAllByRole('button', { name: 'Get real answers' })).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText('Demo · not signed in')).not.toBeInTheDocument();
+
+    // The demo session itself survived — no sign-out, so clicking back in
+    // resumes it rather than starting a second one. A guest cannot sign back
+    // in, so losing the session here would be unrecoverable.
     expect(api.logout).not.toHaveBeenCalled();
+    await user.click(screen.getAllByRole('button', { name: 'Try the demo' })[0]!);
+    expect(await screen.findByText('Demo · not signed in')).toBeInTheDocument();
+    expect(api.startGuest).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ---------------------- a guest is not an account holder ------------------- */
+
+/**
+ * A guest has a `users` row, so `Boolean(session.user)` is true for them. The
+ * landing page keyed its signed-in state off exactly that, and so greeted an
+ * anonymous demo visitor as though they had an account: "Open dashboard", no
+ * sign-up offered. That hid the conversion route from the only people it was
+ * there for.
+ */
+describe('landing page for a guest mid-demo', () => {
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.datasets).mockResolvedValue([]);
+  });
+
+  it('still offers both ways in', async () => {
+    vi.mocked(api.session).mockResolvedValue(GUEST(2));
+    render(<App />);
+
+    expect((await screen.findAllByRole('button', { name: 'Get real answers' })).length)
+      .toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Try the demo' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+
+    // The account-holder treatment must not leak through.
+    expect(screen.queryByRole('button', { name: 'Open dashboard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open VoiceQuery' })).not.toBeInTheDocument();
+  });
+
+  it('greets a real account differently', async () => {
+    vi.mocked(api.session).mockResolvedValue({
+      ...GUEST(0),
+      user: { id: 'u1', email: 'someone', isGuest: false, createdAt: new Date().toISOString() },
+      guest: null,
+    });
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Open dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Get real answers' })).not.toBeInTheDocument();
   });
 });

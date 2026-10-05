@@ -37,7 +37,7 @@ export function Landing({
   onTryDemo,
   onSignIn,
   onGetStarted,
-  signedIn,
+  hasAccount,
   realAiActive = false,
 }: {
   config: AppConfigResponse;
@@ -49,7 +49,12 @@ export function Landing({
    * since a visitor reading the landing page usually has no account yet.
    */
   onGetStarted: () => void;
-  signedIn: boolean;
+  /**
+   * A real account, not merely a session. A guest has a session row too,
+   * so treating that as signed in hid the sign-up route from exactly the
+   * visitors it exists for.
+   */
+  hasAccount: boolean;
   /**
    * True when this visitor's questions reach a real model — because they
    * connected their own key, or the deployment has a platform one. The
@@ -73,7 +78,7 @@ export function Landing({
           <span className="text-base font-semibold text-[var(--text-primary)]">VoiceQuery</span>
         </div>
         <nav className="flex items-center gap-2">
-          {signedIn ? (
+          {hasAccount ? (
             <Button size="sm" onClick={onTryDemo}>
               Open dashboard
             </Button>
@@ -130,7 +135,7 @@ export function Landing({
               visitor clicks sells the simulation rather than the product.
             */}
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              {signedIn ? (
+              {hasAccount ? (
                 <Button size="lg" onClick={onTryDemo}>
                   Open VoiceQuery
                 </Button>
@@ -147,7 +152,7 @@ export function Landing({
                 </>
               )}
               <span className="text-sm text-[var(--text-secondary)]">
-                {signedIn
+                {hasAccount
                   ? 'Sample dataset already loaded'
                   : config.creditsEnabled
                     ? // Only promise free questions where an account actually
@@ -260,7 +265,7 @@ ORDER BY total_revenue DESC LIMIT 10`}</code>
               )}
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {signedIn ? (
+              {hasAccount ? (
                 <Button size="lg" onClick={onTryDemo}>
                   Open VoiceQuery
                 </Button>

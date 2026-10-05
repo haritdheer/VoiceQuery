@@ -167,7 +167,11 @@ export default function App() {
     );
   }
 
+  // Any session at all — a guest included — may use the dashboard.
   const signedIn = Boolean(session.user);
+  // A real account. Guests have neither credentials nor credits, so the
+  // landing page must keep offering them both ways in.
+  const hasAccount = Boolean(session.user && !session.user.isGuest);
 
   return (
     <>
@@ -213,7 +217,7 @@ export default function App() {
       ) : (
         <Landing
           config={config}
-          signedIn={signedIn}
+          hasAccount={hasAccount}
           realAiActive={session.aiMode !== 'demo'}
           onTryDemo={() => void tryDemo()}
           onGetStarted={promptSignUp}

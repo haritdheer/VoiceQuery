@@ -844,7 +844,7 @@ describe('free-allowance copy', () => {
   const FREE_DEMO = { ...METERED, demoMode: true, creditsEnabled: false };
 
   it('promises free questions when credits are actually metered', () => {
-    render(<Landing config={METERED} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={METERED} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(screen.getByText(/5 free questions with an account/)).toBeInTheDocument();
   });
 
@@ -855,13 +855,13 @@ describe('free-allowance copy', () => {
    * not say otherwise.
    */
   it('does not promise a free allowance when nothing is metered', () => {
-    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={FREE_DEMO} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(screen.queryByText(/free questions with an account/)).not.toBeInTheDocument();
     expect(screen.getByText(/Bring your own API key/)).toBeInTheDocument();
   });
 
   it('labels demo mode on the landing page', () => {
-    render(<Landing config={FREE_DEMO} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={FREE_DEMO} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(
       screen.getByText(/answers come from a local stand-in, not an AI model/),
     ).toBeInTheDocument();
@@ -1104,12 +1104,12 @@ describe('header reflects who is actually answering', () => {
 
   it('drops the landing-page demo banner for a BYOK visitor', () => {
     const { rerender } = render(
-      <Landing config={DEMO_DEPLOYMENT} signedIn onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
+      <Landing config={DEMO_DEPLOYMENT} hasAccount onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
     );
     expect(screen.getByText(/answers come from a local stand-in/)).toBeInTheDocument();
 
     rerender(
-      <Landing config={DEMO_DEPLOYMENT} signedIn realAiActive onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
+      <Landing config={DEMO_DEPLOYMENT} hasAccount realAiActive onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />,
     );
     expect(screen.queryByText(/answers come from a local stand-in/)).not.toBeInTheDocument();
   });
