@@ -44,6 +44,7 @@ const { api, ApiRequestError } = await import('../lib/api.ts');
 const { Dashboard } = await import('../pages/Dashboard.tsx');
 const { Landing } = await import('../pages/Landing.tsx');
 const { GuestNudgeModal } = await import('../components/GuestNudgeModal.tsx');
+const { default: App } = await import('../App.tsx');
 
 const noop = () => {};
 
@@ -344,5 +345,84 @@ describe('landing copy with guest mode', () => {
     render(<Landing config={noGuest} signedIn={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
     expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Get real answers' }).length).toBeGreaterThan(0);
+  });
+});
+
+/* ---------------------- entering the demo from the top --------------------- */
+
+/**
+ * The whole App, so "Try the demo" is exercised through the real handler
+ * rather than a stubbed callback. These cover a regression where any failure
+ * from startGuest — including the API simply being down — was answered with
+ * the create-account dialog, which blames the visitor for an outage and
+ * contradicts the "no sign-up needed" promise they just read.
+ */
+describe('clicking Try the demo', () => {
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.session).mockResolvedValue({
+      user: null,
+      credits: 0,
+      freeGrantIssued: false,
+      aiMode: 'demo',
+      creditsApply: false,
+      byokProvider: null,
+      csrfToken: null,
+      guest: null,
+    });
+    vi.mocked(api.datasets).mockResolvedValue([]);
+  });
+
+  async function clickTryTheDemo() {
+    const user = userEvent.setup();
+    render(<App />);
+    const buttons = await screen.findAllByRole('button', { name: 'Try the demo' });
+    await user.click(buttons[0]!);
+    return user;
+  }
+
+  it('goes straight into the demo and explains what it is', async () => {
+    vi.mocked(api.startGuest).mockResolvedValue(GUEST(0));
+    await clickTryTheDemo();
+
+    // No account step at all.
+    expect(screen.queryByText('Create your account')).not.toBeInTheDocument();
+
+    // Straight to the dashboard, with the expectation-setting dialog over it.
+    expect(await screen.findByText("You're in demo mode")).toBeInTheDocument();
+    expect(screen.getByText(/Answers are simulated/)).toBeInTheDocument();
+    // …and it does not oversell the problem either: the engine is genuine.
+    expect(screen.getByText(/Everything else is real/)).toBeInTheDocument();
+  });
+
+  it('dismisses to the working dashboard', async () => {
+    vi.mocked(api.startGuest).mockResolvedValue(GUEST(0));
+    const user = await clickTryTheDemo();
+
+    await screen.findByText("You're in demo mode");
+    await user.click(screen.getByRole('button', { name: 'Explore the demo' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("You're in demo mode")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('Demo · not signed in')).toBeInTheDocument();
+  });
+
+  it('reports an unreachable API instead of demanding an account', async () => {
+    vi.mocked(api.startGuest).mockRejectedValue(new TypeError('Failed to fetch'));
+    await clickTryTheDemo();
+
+    expect(await screen.findByText(/Could not reach the VoiceQuery API/)).toBeInTheDocument();
+    expect(screen.queryByText('Create your account')).not.toBeInTheDocument();
+  });
+
+  it('does offer an account when the server refuses anonymous access', async () => {
+    vi.mocked(api.startGuest).mockRejectedValue(
+      new ApiRequestError('Anonymous demo access is disabled.', 403, 'guest_disabled'),
+    );
+    await clickTryTheDemo();
+
+    // A 403 is the one case where an account really is the only way in.
+    expect(await screen.findByText('Create your account')).toBeInTheDocument();
   });
 });

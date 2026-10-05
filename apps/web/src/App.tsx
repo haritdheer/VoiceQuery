@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppConfigResponse, SessionState } from '@voicequery/shared';
-import { api } from './lib/api.ts';
+import { api, ApiRequestError } from './lib/api.ts';
 import { Landing } from './pages/Landing.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { AuthDialog } from './components/AuthDialog.tsx';
 import { ConnectKeyModal, type ConnectKeyReason } from './components/ConnectKeyModal.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { GuestNudgeModal } from './components/GuestNudgeModal.tsx';
+import { DemoIntroModal } from './components/DemoIntroModal.tsx';
 import { AppFooter } from './components/AppFooter.tsx';
 import { Alert, Spinner } from './components/ui.tsx';
 
@@ -29,6 +30,8 @@ export default function App() {
     reason: 'upgrade',
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [demoIntroOpen, setDemoIntroOpen] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const [nudge, setNudge] = useState<{ open: boolean; blocking: boolean }>({
     open: false,
     blocking: false,
@@ -80,18 +83,37 @@ export default function App() {
       navigate('app');
       return;
     }
+    // Guest mode switched off at the deployment: an account genuinely is the
+    // only way in, so sending them to the sign-up form is the right answer.
     if (!config?.guest.enabled) {
       setAuthMode('register');
       setAuthOpen(true);
       return;
     }
+    setDemoError(null);
     try {
       setSession(await api.startGuest());
       navigate('app');
-    } catch {
-      // Guest mode unavailable — fall back to the sign-up path.
-      setAuthMode('register');
-      setAuthOpen(true);
+      // Set expectations before the first answer, not after it.
+      setDemoIntroOpen(true);
+    } catch (err) {
+      /*
+       * Only a 403 means the server is refusing anonymous access. Anything
+       * else — the API being down, a 500 — is our failure, and the old code
+       * answered all of them with the sign-up dialog. That silently blames
+       * the visitor for an outage and pushes them into creating an account
+       * they were told they would not need.
+       */
+      if (err instanceof ApiRequestError && err.status === 403) {
+        setAuthMode('register');
+        setAuthOpen(true);
+      } else {
+        setDemoError(
+          err instanceof ApiRequestError
+            ? `The demo could not be started: ${err.message}`
+            : 'Could not reach the VoiceQuery API, so the demo could not be started. If you are running this locally, check the server is up.',
+        );
+      }
     }
   }
 
@@ -148,6 +170,25 @@ export default function App() {
 
   return (
     <>
+      {demoError && (
+        <div className="fixed inset-x-0 top-0 z-50 p-3">
+          <div className="mx-auto max-w-2xl">
+            <Alert tone="critical">
+              <div className="flex items-start justify-between gap-3">
+                <p>{demoError}</p>
+                <button
+                  type="button"
+                  onClick={() => setDemoError(null)}
+                  className="shrink-0 text-xs underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </Alert>
+          </div>
+        </div>
+      )}
+
       {route === 'app' && signedIn ? (
         <Dashboard
           session={session}
@@ -186,6 +227,18 @@ export default function App() {
           navigate('app');
         }}
       />
+
+      {session.guest && (
+        <DemoIntroModal
+          open={demoIntroOpen}
+          questionsLimit={session.guest.questionsLimit}
+          onClose={() => setDemoIntroOpen(false)}
+          onGetStarted={() => {
+            setDemoIntroOpen(false);
+            promptSignUp();
+          }}
+        />
+      )}
 
       {session.guest && (
         <GuestNudgeModal

@@ -121,7 +121,7 @@ export function Landing({
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[var(--text-secondary)]">
               Ask a question by voice or text. VoiceQuery writes the SQL, runs it against your
               dataset in an isolated engine, and gives you a chart, the results, and a plain-language
-              answer — with the query it used shown in full.
+              answer with the query it used shown in full.
             </p>
 
             {/*
