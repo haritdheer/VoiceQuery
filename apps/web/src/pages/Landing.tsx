@@ -38,6 +38,7 @@ export function Landing({
   onTryDemo,
   onSignIn,
   onGetStarted,
+  onSignOut,
   hasAccount,
   realAiActive = false,
 }: {
@@ -50,6 +51,11 @@ export function Landing({
    * since a visitor reading the landing page usually has no account yet.
    */
   onGetStarted: () => void;
+  /**
+   * Account holders only. A guest signing out would destroy a demo session
+   * they cannot sign back into, so they are not offered it here.
+   */
+  onSignOut: () => void;
   /**
    * A real account, not merely a session. A guest has a session row too,
    * so treating that as signed in hid the sign-up route from exactly the
@@ -90,7 +96,10 @@ export function Landing({
             label="Menu"
             items={
               hasAccount
-                ? [{ label: 'Open dashboard', onSelect: onTryDemo, emphasis: true }]
+                ? [
+                    { label: 'Open dashboard', onSelect: onTryDemo, emphasis: true },
+                    { label: 'Sign out', onSelect: onSignOut },
+                  ]
                 : [
                     { label: 'Get real answers', onSelect: onGetStarted, emphasis: true },
                     ...(config.guest.enabled
@@ -104,9 +113,14 @@ export function Landing({
 
         <nav className="hidden items-center gap-2 sm:flex">
           {hasAccount ? (
-            <Button size="sm" onClick={onTryDemo}>
-              Open dashboard
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" onClick={onSignOut}>
+                Sign out
+              </Button>
+              <Button size="sm" onClick={onTryDemo}>
+                Open dashboard
+              </Button>
+            </>
           ) : (
             <>
               <Button variant="ghost" size="sm" onClick={onSignIn}>

@@ -332,7 +332,7 @@ describe('guest nudge modal', () => {
 
 describe('landing copy with guest mode', () => {
   it('leads with real answers and offers the demo second', () => {
-    render(<Landing config={CONFIG} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={CONFIG} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} onSignOut={noop} />);
 
     // Both routes are offered, but the demo is explicitly the lesser one —
     // leading with it would be selling the simulation rather than the
@@ -348,7 +348,7 @@ describe('landing copy with guest mode', () => {
       creditsEnabled: true,
       guest: { ...CONFIG.guest, enabled: false },
     };
-    render(<Landing config={noGuest} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} />);
+    render(<Landing config={noGuest} hasAccount={false} onTryDemo={noop} onSignIn={noop} onGetStarted={noop} onSignOut={noop} />);
     expect(screen.queryByRole('button', { name: 'Try the demo' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Get real answers' }).length).toBeGreaterThan(0);
   });
@@ -734,5 +734,55 @@ describe('after creating an account', () => {
     // They already have their datasets and know where they are.
     await waitFor(() => expect(api.login).toHaveBeenCalled());
     expect(screen.queryByText('Your account is ready')).not.toBeInTheDocument();
+  });
+});
+
+/* --------------------- signing out from the landing page ------------------ */
+
+describe('sign out on the landing page', () => {
+  const ACCOUNT: SessionState = {
+    user: { id: 'u1', email: 'someone', isGuest: false, createdAt: new Date().toISOString() },
+    credits: 5,
+    freeGrantIssued: true,
+    aiMode: 'platform',
+    creditsApply: true,
+    byokProvider: null,
+    csrfToken: 'csrf',
+    guest: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.datasets).mockResolvedValue([]);
+  });
+
+  it('is offered to an account holder and actually signs them out', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.session).mockResolvedValue(ACCOUNT);
+    vi.mocked(api.logout).mockResolvedValue({
+      ...ACCOUNT, user: null, credits: 0, csrfToken: null,
+    });
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+    await waitFor(() => expect(api.logout).toHaveBeenCalled());
+    // Back to the signed-out pitch.
+    expect(
+      (await screen.findAllByRole('button', { name: 'Get real answers' })).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('is not offered to a guest', async () => {
+    vi.mocked(api.session).mockResolvedValue(GUEST(1));
+    render(<App />);
+
+    await screen.findAllByRole('button', { name: 'Get real answers' });
+    /*
+     * A guest has no credentials, so signing out destroys a demo session
+     * they cannot get back into. Offering the button would be offering to
+     * throw their work away with no undo.
+     */
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
   });
 });

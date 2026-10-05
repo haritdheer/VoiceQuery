@@ -240,6 +240,7 @@ export default function App() {
           realAiActive={session.aiMode !== 'demo'}
           onTryDemo={() => void tryDemo()}
           onGetStarted={promptSignUp}
+          onSignOut={() => void signOut()}
           onSignIn={() => {
             setAuthMode('login');
             setAuthOpen(true);
