@@ -57,11 +57,18 @@ The app speaks only Postgres. With no `DATABASE_URL` it falls back to
 [PGlite](https://pglite.dev) — genuine Postgres compiled to WebAssembly — so the
 repo runs with zero setup.
 
-PGlite is a single embedded instance, so only one process can hold the data
-directory. If a start fails saying the database could not be opened, the usual
-reason is simply that **you already have a dev server running** — find it
-before doing anything else. Only when nothing is listening is the cluster
-actually damaged, and then:
+**PGlite does not stop two processes opening the same data directory.**
+Verified: two servers opened one directory at the same time and both started
+cleanly, with no error and no lock. They are then two Postgres clusters
+writing the same files, and the corruption only surfaces on a *later* start as
+an unreadable WASM abort — long after the mistake that caused it.
+
+So the server refuses to start when another one already holds the directory,
+naming its process id. If you see that, you already have a server running: use
+it, or stop it first. To run two deliberately, give the second its own
+directory and port (`DATA_DIR=.data-2 PORT=8788 npm run dev:api`).
+
+If a cluster is damaged anyway:
 
 ```bash
 npm run db:reset
@@ -71,11 +78,11 @@ That clears local accounts and chat history, leaves uploaded dataset files
 alone, refuses to run when a real `DATABASE_URL` is set, and re-seeds the
 sample on the next start.
 
-**On Windows this will happen to you.** `tsx watch` kills the process in a way
-Node cannot catch there, so the graceful shutdown in `server.ts` never runs —
-every file save during development is effectively a hard kill of the embedded
-database. Verified: a watch restart never logs `shutting down`. Either live
-with the occasional reset, or avoid the reloader:
+**On Windows, unclean exits are the norm.** `tsx watch` kills the process in a
+way Node cannot catch there, so the graceful shutdown in `server.ts` never
+runs — verified: a watch restart never logs `shutting down`. The lock is
+reclaimed automatically on the next start, so this costs nothing on its own,
+but if resets get tiresome, skip the reloader:
 
 ```bash
 npm run dev:web              # in one terminal

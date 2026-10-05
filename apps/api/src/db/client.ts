@@ -1,3 +1,4 @@
+import nodeFs from 'node:fs';
 import nodePath from 'node:path';
 import { config } from '../config/env.ts';
 
@@ -49,6 +50,76 @@ async function createPostgresDb(url: string): Promise<Db> {
 
 /* --------------------------------- PGlite --------------------------------- */
 
+/**
+ * Stops two dev servers from sharing one data directory.
+ *
+ * PGlite does not guard this itself — verified: two processes opened the same
+ * directory at the same time and both started cleanly, no error, no lock.
+ * They are then two Postgres clusters writing the same files, which corrupts
+ * the cluster and leaves the *next* start failing with an unreadable WASM
+ * abort, long after the mistake.
+ *
+ * PGlite's own postmaster.pid is no help: it contains a constant `-42` rather
+ * than a real process id, so it cannot tell a live instance from an abandoned
+ * one. This writes a real pid alongside it instead.
+ *
+ * A lock naming a process that is gone is stale — an unclean exit, which on
+ * Windows is most exits — and is reclaimed silently. Only a live process
+ * blocks startup.
+ */
+const LOCK_FILE = 'vq-dev.lock';
+
+async function acquireDataDirLock(dataDir: string): Promise<() => void> {
+  const { readFile, writeFile, mkdir } = await import('node:fs/promises');
+  const lockPath = nodePath.join(nodePath.resolve(dataDir), LOCK_FILE);
+
+  await mkdir(nodePath.resolve(dataDir), { recursive: true });
+
+  try {
+    const held = Number((await readFile(lockPath, 'utf8')).trim());
+    if (Number.isInteger(held) && held > 0 && held !== process.pid) {
+      let alive = false;
+      try {
+        // Signal 0 checks for existence without touching the process.
+        process.kill(held, 0);
+        alive = true;
+      } catch {
+        alive = false; // gone, or not ours to signal
+      }
+      if (alive) {
+        throw new Error(
+          [
+            `Another dev server (pid ${held}) is already using ${nodePath.resolve(dataDir)}.`,
+            '',
+            'Two servers sharing one data directory corrupt the database —',
+            'PGlite does not prevent it, so this check does.',
+            '',
+            'Use the server you already have, or stop it before starting a',
+            'second one. To run two deliberately, give this one its own',
+            'directory and port:',
+            '',
+            '    DATA_DIR=.data-2 PORT=8788 npm run dev:api',
+          ].join('\n'),
+        );
+      }
+    }
+  } catch (err) {
+    // Rethrow our own refusal; a missing or unreadable lock is fine.
+    if (err instanceof Error && err.message.startsWith('Another dev server')) throw err;
+  }
+
+  await writeFile(lockPath, String(process.pid), 'utf8');
+  return () => {
+    try {
+      // Synchronous on purpose: this also runs from exit handlers, where a
+      // promise would never get the chance to settle.
+      nodeFs.unlinkSync(lockPath);
+    } catch {
+      /* already gone */
+    }
+  };
+}
+
 async function createPgliteDb(dataDir: string): Promise<Db> {
   const { PGlite } = await import('@electric-sql/pglite');
 
@@ -59,55 +130,38 @@ async function createPgliteDb(dataDir: string): Promise<Db> {
     await mkdir(nodePath.dirname(nodePath.resolve(dataDir)), { recursive: true });
   }
 
+  // Refuse before opening, not after: by the time PGlite has failed, two
+  // instances have already been writing to the same files.
+  const releaseLock = dataDir.startsWith('memory://')
+    ? () => {}
+    : await acquireDataDirLock(dataDir);
+
   /*
-   * A directory that cannot be opened surfaces as a bare WASM
-   * `RuntimeError: Aborted()` over ten frames of `wasm-function[13300]`,
+   * With the lock above holding off the concurrent-access case, a failure
+   * here means the cluster itself is damaged. PGlite reports that as a bare
+   * WASM `RuntimeError: Aborted()` over ten frames of `wasm-function[13300]`,
    * naming neither Postgres nor the directory nor any way forward.
-   *
-   * Two quite different things produce it, and they want opposite responses:
-   * a second dev server competing for the directory (nothing is wrong — stop
-   * one of them), or a genuinely damaged cluster (delete it). PGlite writes a
-   * constant `-42` into postmaster.pid rather than a real process id, so the
-   * lock file cannot distinguish them and neither can we.
-   *
-   * So the message asks rather than guesses, and puts the harmless check
-   * first. Getting that order wrong is not cosmetic: deleting the directory
-   * while another instance holds it open is itself a way to corrupt it.
    */
   const pg = await PGlite.create(dataDir).catch((err: unknown) => {
+    releaseLock();
     if (dataDir.startsWith('memory://')) throw err;
-    const { PORT } = config();
-    const resolved = nodePath.resolve(dataDir);
     throw new Error(
       [
-        `The local database at ${resolved} could not be opened.`,
+        `The local database at ${nodePath.resolve(dataDir)} is damaged.`,
         '',
-        'Two things cause this. Check them in this order.',
+        'Clear it and start again:',
         '',
-        '1. Another dev server already has it open. PGlite is a single',
-        '   embedded instance, so only one process can hold the directory.',
-        '   This is the common case and nothing is wrong — you already have',
-        `   a server running. This one wanted port ${PORT}; look there first,`,
-        '   and anywhere else you may have started it:',
+        '    npm run db:reset',
         '',
-        `     Windows        netstat -ano | findstr :${PORT}`,
-        `     macOS / Linux  lsof -i :${PORT}`,
+        'It holds local accounts and chat history and nothing else, so this is',
+        'safe — production is real Postgres and the sample dataset is recreated',
+        'on the next start.',
         '',
-        '   If something is listening, that is it. Use it, or stop it before',
-        '   starting another.',
-        '',
-        '2. Only if nothing is listening: the cluster is damaged. It holds',
-        '   local accounts and chat history and nothing else, so clearing it',
-        '   is safe — production is real Postgres, and the sample dataset is',
-        '   recreated on the next start.',
-        '',
-        '     npm run db:reset',
-        '',
-        '   On Windows this happens more often than it should: tsx watch',
-        '   kills the process in a way Node cannot catch there, so the',
-        '   graceful shutdown never runs and every file save during dev is',
-        '   effectively a hard kill. `npm run dev:api:noreload` avoids it at',
-        '   the cost of restarting the API yourself.',
+        'The usual cause is an unclean exit. On Windows that is most exits:',
+        'tsx watch kills the process in a way Node cannot catch, so the',
+        'graceful shutdown never runs and every file save during development',
+        'is effectively a hard kill. `npm run dev:api:noreload` avoids it, at',
+        'the cost of restarting the API yourself after backend edits.',
         '',
         `Original error: ${err instanceof Error ? err.message : String(err)}`,
       ].join('\n'),
@@ -129,7 +183,9 @@ async function createPgliteDb(dataDir: string): Promise<Db> {
       return result as T;
     },
     async close() {
-      if (!inTx) await pg.close();
+      if (inTx) return;
+      await pg.close();
+      releaseLock();
     },
   });
 
