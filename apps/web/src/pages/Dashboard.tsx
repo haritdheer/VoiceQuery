@@ -14,6 +14,7 @@ import { MessageCard, PendingCard } from '../components/MessageCard.tsx';
 import { api, ApiRequestError } from '../lib/api.ts';
 import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
 import type { ConnectKeyReason } from '../components/ConnectKeyModal.tsx';
+import { HeaderMenu } from '../components/HeaderMenu.tsx';
 
 /**
  * The working surface: dataset selection on the left, conversation on the right.
@@ -285,7 +286,7 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
-            className="rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-2)] lg:hidden"
+            className="hidden rounded-lg p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-2)] sm:block lg:hidden"
             aria-label={sidebarOpen ? 'Hide datasets' : 'Show datasets'}
             aria-expanded={sidebarOpen}
           >
@@ -384,21 +385,50 @@ export function Dashboard({
               </button>
             )}
 
-            {messages.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={startNewConversation}>
-                New chat
-              </Button>
-            )}
-            {!isGuest && (
-              <>
-                <Button variant="ghost" size="sm" onClick={onOpenSettings}>
-                  Settings
+            {/* From sm up there is room for these inline. */}
+            <div className="hidden items-center gap-2 sm:flex">
+              {messages.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={startNewConversation}>
+                  New chat
                 </Button>
-                <Button variant="ghost" size="sm" onClick={onSignOut}>
-                  Sign out
-                </Button>
-              </>
-            )}
+              )}
+              {!isGuest && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={onOpenSettings}>
+                    Settings
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={onSignOut}>
+                    Sign out
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/*
+              On a phone these collapse into the same menu, which also picks
+              up the dataset list — the sidebar toggle was on the far left,
+              away from everything else, so there were two unrelated menus on
+              a screen with room for one.
+            */}
+            <div className="sm:hidden">
+              <HeaderMenu
+                attention
+                label="Menu"
+                items={[
+                  { label: sidebarOpen ? 'Hide datasets' : 'Datasets', onSelect: () => setSidebarOpen((v) => !v) },
+                  ...(messages.length > 0
+                    ? [{ label: 'New chat', onSelect: startNewConversation }]
+                    : []),
+                  ...(isGuest
+                    ? [{ label: 'Create a free account', onSelect: () => onSignUp?.(), emphasis: true }]
+                    : [
+                        { label: 'Settings', onSelect: onOpenSettings },
+                        { label: 'Sign out', onSelect: onSignOut },
+                      ]),
+                  { label: 'Back to home', onSelect: () => onBack?.() },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </header>

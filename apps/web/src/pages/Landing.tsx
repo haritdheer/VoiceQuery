@@ -1,6 +1,7 @@
 import type { AppConfigResponse } from '@voicequery/shared';
 import { Badge, Button, Card } from '../components/ui.tsx';
 import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
+import { HeaderMenu } from '../components/HeaderMenu.tsx';
 
 const STEPS = [
   {
@@ -77,7 +78,30 @@ export function Landing({
           <Logo />
           <span className="text-base font-semibold text-[var(--text-primary)]">VoiceQuery</span>
         </div>
-        <nav className="flex items-center gap-2">
+        {/*
+          Below sm the three actions ran out of room and overlapped the
+          wordmark, so they collapse into one menu there and stay inline
+          from sm up.
+        */}
+        <div className="sm:hidden">
+          <HeaderMenu
+            attention
+            label="Menu"
+            items={
+              hasAccount
+                ? [{ label: 'Open dashboard', onSelect: onTryDemo, emphasis: true }]
+                : [
+                    { label: 'Get real answers', onSelect: onGetStarted, emphasis: true },
+                    ...(config.guest.enabled
+                      ? [{ label: 'Try the demo', onSelect: onTryDemo }]
+                      : []),
+                    { label: 'Sign in', onSelect: onSignIn },
+                  ]
+            }
+          />
+        </div>
+
+        <nav className="hidden items-center gap-2 sm:flex">
           {hasAccount ? (
             <Button size="sm" onClick={onTryDemo}>
               Open dashboard

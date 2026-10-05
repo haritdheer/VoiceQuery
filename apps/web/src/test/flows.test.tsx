@@ -57,6 +57,7 @@ const { Composer } = await import('../components/Composer.tsx');
 const { Landing } = await import('../pages/Landing.tsx');
 const { AuthDialog } = await import('../components/AuthDialog.tsx');
 const { AppFooter } = await import('../components/AppFooter.tsx');
+const { HeaderMenu } = await import('../components/HeaderMenu.tsx');
 
 /* --------------------------------- fixtures -------------------------------- */
 
@@ -1132,5 +1133,68 @@ describe('persistent credit footer', () => {
   it('hides the decorative heart from screen readers', () => {
     const { container } = render(<AppFooter />);
     expect(container.querySelector('[aria-hidden="true"]')?.textContent).toBe('💙');
+  });
+});
+
+/* ------------------------------ header menu ------------------------------ */
+
+/**
+ * The collapsed header. jsdom does not apply the media queries, so these
+ * drive the component directly rather than trying to simulate a phone.
+ */
+describe('header menu', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* not available in every environment */
+    }
+  });
+
+  it('keeps its items out of the page until opened', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<HeaderMenu items={[{ label: 'Sign out', onSelect }]} />);
+
+    // Matters because the same labels exist as inline buttons at wider
+    // widths — if the menu rendered them while closed, every query for
+    // "Sign out" would match twice.
+    expect(screen.queryByRole('menuitem', { name: 'Sign out' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    // …and it closes behind the choice.
+    expect(screen.queryByRole('menuitem', { name: 'Sign out' })).not.toBeInTheDocument();
+  });
+
+  it('closes on Escape without choosing anything', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<HeaderMenu items={[{ label: 'Settings', onSelect }]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('stops drawing attention once the menu has been found', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<HeaderMenu attention items={[{ label: 'X', onSelect: noop }]} />);
+
+    const button = () => screen.getByRole('button', { name: 'Menu' });
+    expect(button()).toHaveClass('vq-attention');
+
+    await user.click(button());
+    expect(button()).not.toHaveClass('vq-attention');
+
+    // And it stays found: a cue that returns on every visit is just noise.
+    unmount();
+    render(<HeaderMenu attention items={[{ label: 'X', onSelect: noop }]} />);
+    expect(screen.getByRole('button', { name: 'Menu' })).not.toHaveClass('vq-attention');
   });
 });
