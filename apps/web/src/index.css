@@ -228,8 +228,13 @@ body {
   perspective: 1100px;
   perspective-origin: 50% 40%;
   pointer-events: none;
-  /* Keeps the panels from crowding the content they sit behind. */
-  mask-image: radial-gradient(ellipse 85% 70% at 50% 45%, transparent 35%, black 100%);
+  /*
+   * Fades the panels out of the middle so they never sit directly behind the
+   * reading column. Tighter than it first was: the old stop ran the fade all
+   * the way to the edges, which dimmed the panels everywhere instead of just
+   * clearing the centre.
+   */
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 20%, black 62%);
 }
 
 .vq-field-panel {
@@ -248,26 +253,42 @@ body {
 }
 
 /*
- * One keyframe set, varied per panel by the custom properties below, so a
- * dozen panels cost one animation definition instead of a dozen.
+ * One keyframe set, varied per panel by custom properties, so a dozen panels
+ * cost one animation definition instead of a dozen.
+ *
+ * Three stops rather than two: a straight from/to alternating is a shuttle
+ * back and forth along one line, which reads as a glitch rather than drift.
+ * The midpoint pushes the panel off that line so it travels an arc.
+ *
+ * The travel is deliberately large. The first version moved 18px over 23
+ * seconds — under a pixel a second, which is motion you can measure but not
+ * see, so the whole thing looked like a static image.
  */
 @keyframes vq-drift {
-  from {
+  0% {
     transform: translate3d(0, 0, var(--vq-z, 0px)) rotateX(var(--vq-rx, 0deg))
       rotateY(var(--vq-ry, 0deg));
   }
-  to {
-    transform: translate3d(var(--vq-dx, 0px), var(--vq-dy, -26px), var(--vq-z2, 0px))
-      rotateX(calc(var(--vq-rx, 0deg) + 4deg)) rotateY(calc(var(--vq-ry, 0deg) - 5deg));
+  50% {
+    transform: translate3d(
+        calc(var(--vq-dx, 90px) * 0.6),
+        calc(var(--vq-dy, -70px) * 0.45),
+        calc(var(--vq-z, 0px) + 120px)
+      )
+      rotateX(calc(var(--vq-rx, 0deg) - 7deg)) rotateY(calc(var(--vq-ry, 0deg) + 10deg));
+  }
+  100% {
+    transform: translate3d(var(--vq-dx, 90px), var(--vq-dy, -70px), var(--vq-z2, 0px))
+      rotateX(calc(var(--vq-rx, 0deg) + 9deg)) rotateY(calc(var(--vq-ry, 0deg) - 12deg));
   }
 }
 
 .vq-field-sql {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.6;
   white-space: pre;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 .vq-field-kw {
   color: var(--accent);

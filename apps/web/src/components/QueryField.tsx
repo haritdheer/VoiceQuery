@@ -34,29 +34,41 @@ interface Panel {
  */
 const PANELS: Panel[] = [
   {
-    left: 2, top: 12, z: -260, rotateX: 6, rotateY: 22, seconds: 23, delay: 0,
+    left: 1, top: 10, z: -120, rotateX: 6, rotateY: 24, seconds: 15, delay: 0,
     content: 'sql',
     sql: ['SELECT region,', '  SUM(revenue) AS total', 'FROM t', 'GROUP BY region'],
   },
-  { left: 11, top: 58, z: -420, rotateX: -4, rotateY: 18, seconds: 31, delay: 3, content: 'bars' },
+  { left: 9, top: 56, z: -220, rotateX: -5, rotateY: 20, seconds: 19, delay: 2, content: 'bars' },
   {
-    left: 76, top: 8, z: -340, rotateX: 8, rotateY: -24, seconds: 27, delay: 1.5,
+    left: 77, top: 6, z: -170, rotateX: 8, rotateY: -26, seconds: 17, delay: 1,
     content: 'sql',
     sql: ['SELECT product,', '  COUNT(*) AS orders', 'FROM t', 'ORDER BY orders DESC'],
   },
-  { left: 85, top: 52, z: -200, rotateX: -6, rotateY: -20, seconds: 21, delay: 5, content: 'line' },
+  { left: 86, top: 48, z: -90, rotateX: -7, rotateY: -22, seconds: 13, delay: 3, content: 'line' },
   {
-    left: 68, top: 78, z: -500, rotateX: 5, rotateY: -14, seconds: 35, delay: 2,
+    left: 70, top: 76, z: -260, rotateX: 5, rotateY: -16, seconds: 21, delay: 1.5,
     content: 'sql',
-    sql: ['WHERE order_date', '  >= DATE \'2024-01-01\''],
+    sql: ["WHERE order_date", "  >= DATE '2024-01-01'"],
   },
-  { left: 4, top: 82, z: -300, rotateX: -5, rotateY: 16, seconds: 29, delay: 6, content: 'bars' },
+  { left: 3, top: 80, z: -150, rotateX: -6, rotateY: 18, seconds: 16, delay: 4, content: 'bars' },
   {
-    left: 44, top: 4, z: -620, rotateX: 10, rotateY: 4, seconds: 33, delay: 4,
+    left: 40, top: 2, z: -320, rotateX: 11, rotateY: 5, seconds: 23, delay: 2.5,
     content: 'sql',
     sql: ['SELECT channel, AVG(unit_price)', 'FROM t GROUP BY channel'],
   },
-  { left: 32, top: 88, z: -560, rotateX: -8, rotateY: 8, seconds: 25, delay: 7, content: 'line' },
+  { left: 28, top: 86, z: -290, rotateX: -9, rotateY: 9, seconds: 18, delay: 5, content: 'line' },
+  {
+    left: 88, top: 24, z: -240, rotateX: 4, rotateY: -18, seconds: 20, delay: 0.5,
+    content: 'sql',
+    sql: ['HAVING SUM(revenue) > 10000'],
+  },
+  { left: 62, top: 34, z: -380, rotateX: -4, rotateY: -10, seconds: 24, delay: 6, content: 'bars' },
+  {
+    left: 16, top: 30, z: -350, rotateX: 7, rotateY: 14, seconds: 22, delay: 3.5,
+    content: 'sql',
+    sql: ['ORDER BY total DESC', 'LIMIT 10'],
+  },
+  { left: 48, top: 68, z: -420, rotateX: -6, rotateY: 3, seconds: 26, delay: 1, content: 'line' },
 ];
 
 const KEYWORDS = new Set([
@@ -137,24 +149,27 @@ export function QueryField({
 }: {
   intensity?: 'landing' | 'app';
 }) {
-  const baseOpacity = intensity === 'landing' ? 1 : 0.35;
+  const baseOpacity = intensity === 'landing' ? 1 : 0.55;
 
   return (
     <div className="vq-field" aria-hidden="true">
       {PANELS.map((p, i) => {
-        // Further-back panels are dimmer, which is what sells the depth more
-        // than the transform does.
-        const depth = Math.min(1, Math.abs(p.z) / 620);
+        // Further-back panels are dimmer, which sells the depth more than the
+        // transform does. The floor is high enough that the back row is still
+        // actually visible — at the old 0.2 it may as well not have rendered.
+        const depth = Math.min(1, Math.abs(p.z) / 420);
         const style: CSSProperties & Record<string, string | number> = {
           left: `${p.left}%`,
           top: `${p.top}%`,
-          opacity: (0.5 - depth * 0.3) * baseOpacity,
+          opacity: (0.95 - depth * 0.35) * baseOpacity,
           animationDuration: `${p.seconds}s`,
-          animationDelay: `${p.delay}s`,
+          animationDelay: `-${p.delay}s`,
           '--vq-z': `${p.z}px`,
-          '--vq-z2': `${p.z + 60}px`,
-          '--vq-dx': `${i % 2 === 0 ? 18 : -18}px`,
-          '--vq-dy': `${-20 - (i % 3) * 10}px`,
+          '--vq-z2': `${p.z + 140}px`,
+          // Travel large enough to read as drift. Alternating direction keeps
+          // the field from sliding as one block.
+          '--vq-dx': `${i % 2 === 0 ? 110 : -110}px`,
+          '--vq-dy': `${-70 - (i % 3) * 35}px`,
           '--vq-rx': `${p.rotateX}deg`,
           '--vq-ry': `${p.rotateY}deg`,
         };
