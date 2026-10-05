@@ -611,3 +611,41 @@ describe('demo explainer', () => {
     expect(screen.queryByText("You're in demo mode")).not.toBeInTheDocument();
   });
 });
+
+/* ------------------------- the compact demo badge ------------------------- */
+
+describe('demo badge', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* not available everywhere */
+    }
+  });
+
+  it('keeps the meaning that the short label drops', async () => {
+    const user = userEvent.setup();
+    renderDashboard(GUEST(0));
+
+    // One word in the header; the rest behind it, rather than lost.
+    await user.click(await screen.findByRole('button', { name: 'What demo mode means' }));
+
+    expect(screen.getByText('This is demo data')).toBeInTheDocument();
+    expect(screen.getByText(/written\s+by a built-in rule, not an AI model/)).toBeInTheDocument();
+    // Still says what is genuine — the engine and the numbers are real.
+    expect(screen.getByText(/query engine and the numbers in the tables are all genuine/))
+      .toBeInTheDocument();
+  });
+
+  it('routes Upload a dataset to the dataset panel', async () => {
+    const user = userEvent.setup();
+    renderDashboard(GUEST(0));
+
+    await user.click(await screen.findByRole('button', { name: 'What demo mode means' }));
+    await user.click(screen.getByRole('button', { name: 'Upload a dataset' }));
+
+    // The panel is where uploading lives, and for a guest it is also where
+    // the account requirement is explained.
+    expect(await screen.findByText(/Uploading a CSV needs a free account/)).toBeInTheDocument();
+  });
+});

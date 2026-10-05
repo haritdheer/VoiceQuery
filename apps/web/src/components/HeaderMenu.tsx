@@ -27,12 +27,19 @@ export function HeaderMenu({
    * is just noise, and by then the user has found it.
    */
   attention = false,
+  attentionKey = 'default',
   label = 'Menu',
   className,
   children,
 }: {
   items: MenuItem[];
   attention?: boolean;
+  /**
+   * Scopes the "already found it" memory. The landing and dashboard menus
+   * hold different things, so finding one teaches you nothing about the
+   * other — sharing a key meant the second never pulsed at all.
+   */
+  attentionKey?: string;
   label?: string;
   className?: string;
   /** Optional extra content rendered above the items. */
@@ -43,7 +50,7 @@ export function HeaderMenu({
     // Per browser, so the ring does not reappear on every visit. Storage can
     // throw in a private window, where forgetting is the harmless outcome.
     try {
-      return localStorage.getItem('vq-menu-used') === '1';
+      return localStorage.getItem(`vq-menu-used:${attentionKey}`) === '1';
     } catch {
       return false;
     }
@@ -71,7 +78,7 @@ export function HeaderMenu({
     if (!used) {
       setUsed(true);
       try {
-        localStorage.setItem('vq-menu-used', '1');
+        localStorage.setItem(`vq-menu-used:${attentionKey}`, '1');
       } catch {
         /* nothing depends on this persisting */
       }

@@ -15,6 +15,7 @@ import { api, ApiRequestError } from '../lib/api.ts';
 import { FOOTER_SPACER_CLASS } from '../components/AppFooter.tsx';
 import type { ConnectKeyReason } from '../components/ConnectKeyModal.tsx';
 import { HeaderMenu } from '../components/HeaderMenu.tsx';
+import { DemoBadge } from '../components/DemoBadge.tsx';
 
 /**
  * The working surface: dataset selection on the left, conversation on the right.
@@ -336,15 +337,28 @@ export function Dashboard({
           <div className="ml-auto flex items-center gap-2">
             {isGuest ? (
               <>
-                <Badge
-                  tone="warning"
-                  title="You are exploring anonymously. Answers are sample responses, not AI output."
-                >
-                  Demo · not signed in
-                </Badge>
-                <Button size="sm" onClick={() => onSignUp?.()}>
-                  Sign up free
-                </Button>
+                {/*
+                  Two shapes of the same fact. The full label plus a sign-up
+                  button needs room a phone does not have — there it wrapped
+                  to two lines and shoved the controls into the wordmark — so
+                  below sm it becomes one word with the explanation, and the
+                  sign-up route moves into the menu where the other actions
+                  already live.
+                */}
+                <div className="sm:hidden">
+                  <DemoBadge onUploadData={() => setSidebarOpen(true)} />
+                </div>
+                <div className="hidden items-center gap-2 sm:flex">
+                  <Badge
+                    tone="warning"
+                    title="You are exploring anonymously. Answers are sample responses, not AI output."
+                  >
+                    Demo · not signed in
+                  </Badge>
+                  <Button size="sm" onClick={() => onSignUp?.()}>
+                    Sign up free
+                  </Button>
+                </div>
               </>
             ) : session.aiMode === 'byok' ? (
               <Badge tone="accent" title="Your provider key is paying for model usage.">
@@ -413,6 +427,7 @@ export function Dashboard({
             <div className="sm:hidden">
               <HeaderMenu
                 attention
+                attentionKey="dashboard"
                 label="Menu"
                 items={[
                   { label: sidebarOpen ? 'Hide datasets' : 'Datasets', onSelect: () => setSidebarOpen((v) => !v) },

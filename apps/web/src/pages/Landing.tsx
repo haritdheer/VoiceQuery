@@ -86,6 +86,7 @@ export function Landing({
         <div className="sm:hidden">
           <HeaderMenu
             attention
+            attentionKey="landing"
             label="Menu"
             items={
               hasAccount

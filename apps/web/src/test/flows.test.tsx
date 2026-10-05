@@ -1198,3 +1198,32 @@ describe('header menu', () => {
     expect(screen.getByRole('button', { name: 'Menu' })).not.toHaveClass('vq-attention');
   });
 });
+
+/* --------------- the attention ring is remembered per menu ---------------- */
+
+describe('attention ring scoping', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* not available everywhere */
+    }
+  });
+
+  it('finding one menu does not silence another', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <HeaderMenu attention attentionKey="landing" items={[{ label: 'A', onSelect: noop }]} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    unmount();
+
+    // A different menu holds different things, so finding the first teaches
+    // the user nothing about the second. Sharing one key meant the dashboard
+    // menu never pulsed at all once the landing one had been opened.
+    render(
+      <HeaderMenu attention attentionKey="dashboard" items={[{ label: 'B', onSelect: noop }]} />,
+    );
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveClass('vq-attention');
+  });
+});
