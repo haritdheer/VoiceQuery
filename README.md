@@ -61,9 +61,29 @@ PGlite is a single embedded instance, so only one process can hold the data
 directory. If a start fails saying the database could not be opened, the usual
 reason is simply that **you already have a dev server running** — find it
 before doing anything else. Only when nothing is listening is the cluster
-actually damaged (which a killed, rather than stopped, server can do), and
-then `rm -rf apps/api/.data/pglite` clears it: it holds local accounts and
-chat history only, and the sample dataset re-seeds on the next start.
+actually damaged, and then:
+
+```bash
+npm run db:reset
+```
+
+That clears local accounts and chat history, leaves uploaded dataset files
+alone, refuses to run when a real `DATABASE_URL` is set, and re-seeds the
+sample on the next start.
+
+**On Windows this will happen to you.** `tsx watch` kills the process in a way
+Node cannot catch there, so the graceful shutdown in `server.ts` never runs —
+every file save during development is effectively a hard kill of the embedded
+database. Verified: a watch restart never logs `shutting down`. Either live
+with the occasional reset, or avoid the reloader:
+
+```bash
+npm run dev:web              # in one terminal
+npm run dev:api:noreload     # in another; restart it yourself after API edits
+```
+
+Neither applies with a real `DATABASE_URL`, which is the better answer if you
+are doing sustained backend work on Windows.
 
 To use a real server: 
 
