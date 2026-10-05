@@ -57,11 +57,13 @@ The app speaks only Postgres. With no `DATABASE_URL` it falls back to
 [PGlite](https://pglite.dev) — genuine Postgres compiled to WebAssembly — so the
 repo runs with zero setup.
 
-PGlite is a single embedded instance, so killing the dev server rather than
-stopping it can leave the cluster locked or half-written and the next start
-fails. The error says so and tells you to `rm -rf apps/api/.data/pglite` —
-safe, because it holds only local accounts and chat history, and the sample
-dataset re-seeds on the next start.
+PGlite is a single embedded instance, so only one process can hold the data
+directory. If a start fails saying the database could not be opened, the usual
+reason is simply that **you already have a dev server running** — find it
+before doing anything else. Only when nothing is listening is the cluster
+actually damaged (which a killed, rather than stopped, server can do), and
+then `rm -rf apps/api/.data/pglite` clears it: it holds local accounts and
+chat history only, and the sample dataset re-seeds on the next start.
 
 To use a real server: 
 

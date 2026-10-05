@@ -1,3 +1,4 @@
+import nodePath from 'node:path';
 import { config } from '../config/env.ts';
 
 /**
@@ -55,35 +56,53 @@ async function createPgliteDb(dataDir: string): Promise<Db> {
   // enclosing data directory exists first.
   if (!dataDir.startsWith('memory://')) {
     const { mkdir } = await import('node:fs/promises');
-    const path = await import('node:path');
-    await mkdir(path.dirname(path.resolve(dataDir)), { recursive: true });
+    await mkdir(nodePath.dirname(nodePath.resolve(dataDir)), { recursive: true });
   }
 
   /*
-   * A corrupt or still-locked data directory surfaces as a bare WASM
-   * `RuntimeError: Aborted()` with a stack full of `wasm-function[13300]`
-   * and no mention of Postgres, the directory, or what to do — which reads
-   * like the app is broken rather than like local state needs clearing.
+   * A directory that cannot be opened surfaces as a bare WASM
+   * `RuntimeError: Aborted()` over ten frames of `wasm-function[13300]`,
+   * naming neither Postgres nor the directory nor any way forward.
    *
-   * The usual cause is a dev server killed hard: PGlite is a single embedded
-   * instance, so it leaves a postmaster.pid behind and can leave the cluster
-   * mid-write. Deleting the directory is safe here and nowhere else —
-   * production is real Postgres, and the sample dataset re-seeds on boot.
+   * Two quite different things produce it, and they want opposite responses:
+   * a second dev server competing for the directory (nothing is wrong — stop
+   * one of them), or a genuinely damaged cluster (delete it). PGlite writes a
+   * constant `-42` into postmaster.pid rather than a real process id, so the
+   * lock file cannot distinguish them and neither can we.
+   *
+   * So the message asks rather than guesses, and puts the harmless check
+   * first. Getting that order wrong is not cosmetic: deleting the directory
+   * while another instance holds it open is itself a way to corrupt it.
    */
   const pg = await PGlite.create(dataDir).catch((err: unknown) => {
     if (dataDir.startsWith('memory://')) throw err;
+    const { PORT } = config();
+    const resolved = nodePath.resolve(dataDir);
     throw new Error(
       [
-        `The local database at ${dataDir} could not be opened.`,
+        `The local database at ${resolved} could not be opened.`,
         '',
-        'This is usually a dev server that was killed rather than stopped,',
-        'leaving the embedded Postgres cluster locked or half-written.',
+        'Two things cause this. Check them in this order.',
         '',
-        'It holds only local accounts and chat history. To reset it:',
+        '1. Another dev server already has it open. PGlite is a single',
+        '   embedded instance, so only one process can hold the directory.',
+        '   This is the common case and nothing is wrong — you already have',
+        `   a server running. This one wanted port ${PORT}; look there first,`,
+        '   and anywhere else you may have started it:',
         '',
-        `  rm -rf ${dataDir}`,
+        `     Windows        netstat -ano | findstr :${PORT}`,
+        `     macOS / Linux  lsof -i :${PORT}`,
         '',
-        'The sample dataset is recreated on the next start.',
+        '   If something is listening, that is it. Use it, or stop it before',
+        '   starting another.',
+        '',
+        '2. Only if nothing is listening: the cluster is damaged, usually',
+        '   from a dev server killed rather than stopped. It holds local',
+        '   accounts and chat history and nothing else, so clearing it is',
+        '   safe here — production is real Postgres, and the sample dataset',
+        '   is recreated on the next start.',
+        '',
+        `     rm -rf ${resolved}`,
         '',
         `Original error: ${err instanceof Error ? err.message : String(err)}`,
       ].join('\n'),
