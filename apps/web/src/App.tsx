@@ -208,6 +208,7 @@ export default function App() {
           onSignOut={() => void signOut()}
           onGuestNudge={(blocking) => setNudge({ open: true, blocking })}
           onSignUp={promptSignUp}
+          onBack={() => navigate('landing')}
         />
       ) : (
         <Landing

@@ -476,3 +476,44 @@ describe('background field', () => {
     expect(await screen.findByText("You're in demo mode")).toBeInTheDocument();
   });
 });
+
+/* --------------------------- leaving the dashboard ------------------------- */
+
+describe('back to the landing page', () => {
+  beforeEach(() => {
+    vi.mocked(api.config).mockResolvedValue(CONFIG);
+    vi.mocked(api.session).mockResolvedValue({
+      user: null,
+      credits: 0,
+      freeGrantIssued: false,
+      aiMode: 'demo',
+      creditsApply: false,
+      byokProvider: null,
+      csrfToken: null,
+      guest: null,
+    });
+  });
+
+  it('returns home without signing out', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.startGuest).mockResolvedValue(GUEST(0));
+    render(<App />);
+
+    // In…
+    await user.click((await screen.findAllByRole('button', { name: 'Try the demo' }))[0]!);
+    await screen.findByText("You're in demo mode");
+    await user.click(screen.getByRole('button', { name: 'Explore the demo' }));
+    await screen.findByText('Demo · not signed in');
+
+    // …and back out.
+    await user.click(screen.getByRole('button', { name: 'Back to the home page' }));
+
+    // The landing page, and still in session — a signed-in visitor is offered
+    // the way back in, not asked to start over. Logout must not have run.
+    expect(
+      (await screen.findAllByRole('button', { name: 'Open VoiceQuery' })).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('Demo · not signed in')).not.toBeInTheDocument();
+    expect(api.logout).not.toHaveBeenCalled();
+  });
+});

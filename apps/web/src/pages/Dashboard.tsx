@@ -32,6 +32,7 @@ export function Dashboard({
   onGuestNudge,
   onSignUp,
   onConnectKey,
+  onBack,
 }: {
   session: SessionState;
   config: AppConfigResponse;
@@ -42,6 +43,8 @@ export function Dashboard({
   /** Raised when a guest should be shown the sign-in nudge. */
   onGuestNudge?: (blocking: boolean) => void;
   onSignUp?: () => void;
+  /** Leaves the dashboard for the landing page, keeping the session. */
+  onBack?: () => void;
   /** Opens the provider-key form directly, with the reason it is showing. */
   onConnectKey?: (reason?: ConnectKeyReason) => void;
 }) {
@@ -291,7 +294,34 @@ export function Dashboard({
             </svg>
           </button>
 
-          <span className="text-sm font-semibold text-[var(--text-primary)]">VoiceQuery</span>
+          {/*
+            Leaves the dashboard without signing out — the session, datasets
+            and conversation are all still there when you come back. The
+            wordmark is part of the control rather than a second one beside
+            it, because "click the logo for home" is what people try anyway.
+          */}
+          <button
+            type="button"
+            onClick={() => onBack?.()}
+            className="group -ml-1 flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]"
+            aria-label="Back to the home page"
+          >
+            <svg
+              className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M9.5 3.5 5 8l4.5 4.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">VoiceQuery</span>
+          </button>
 
           {/*
             No deployment-level "Demo mode" badge here. It keyed off
